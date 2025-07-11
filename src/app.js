@@ -13,6 +13,7 @@ const { logHealthCheck, logDocsAccess } = require('./middlewares/logging-middlew
 // Importar rotas
 const authRoutes = require('./routes/auth-routes');
 const profileRoutes = require('./routes/profile-routes');
+const contentRoutes = require('./routes/content-routes');
 
 // Importar logger
 const { logger } = require('./config/logger');
@@ -100,6 +101,18 @@ app.get('/', logDocsAccess, (req, res) => {
                 updateAvatar: 'PUT /api/v1/profiles/:profileId/avatar',
                 authenticate: 'POST /api/v1/profiles/authenticate',
                 avatars: 'GET /api/v1/profiles/avatars'
+            },
+            contents: {
+                list: 'GET /api/v1/contents',
+                create: 'POST /api/v1/contents (Admin only)',
+                get: 'GET /api/v1/contents/:contentId',
+                update: 'PUT /api/v1/contents/:contentId (Admin only)',
+                delete: 'DELETE /api/v1/contents/:contentId (Admin only)',
+                popular: 'GET /api/v1/contents/popular',
+                recordView: 'POST /api/v1/contents/:contentId/view',
+                seriesEpisodes: 'GET /api/v1/contents/series/:seriesName/episodes',
+                stats: 'GET /api/v1/contents/admin/stats (Admin only)',
+                viewStats: 'GET /api/v1/contents/:contentId/stats (Admin only)'
             }
         }
     });
@@ -108,6 +121,7 @@ app.get('/', logDocsAccess, (req, res) => {
 // Rotas da API
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/profiles', profileRoutes);
+app.use('/api/v1/contents', contentRoutes);
 
 // Middleware de tratamento de rotas não encontradas
 app.use((req, res, next) => {

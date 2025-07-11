@@ -1,0 +1,560 @@
+{
+  "rota": "GET /api/v1/contents/popular",
+  "descricao": "Obter lista dos conteúdos mais visualizados",
+  "query_params": {
+    "limit": "number (opcional, padrão: 10, máximo: 50)"
+  },
+  "payload": null,
+  "resposta_sucesso": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Conteúdos populares obtidos com sucesso",
+      "data": [
+        {
+          "id": "123e4567-e89b-12d3-a456-426614174000",
+          "nome": "Vingadores: Ultimato",
+          "url_transmissao": "https://cdn.exemplo.com/vingadores.m3u8",
+          "poster": "https://cdn.exemplo.com/posters/vingadores.jpg",
+          "categoria": "acao",
+          "subcategoria": "filme",
+          "ativo": true,
+          "temporada": null,
+          "episodio": null,
+          "rating": 9.2,
+          "total_visualizations": 15420,
+          "qualidades": ["4k", "1080p", "720p"],
+          "metadata": {
+            "descricao": "A batalha final contra Thanos",
+            "duracao": 181,
+            "ano_lancamento": 2019,
+            "diretor": "Anthony Russo, Joe Russo"
+          },
+          "created_at": "2025-01-01T00:00:00Z",
+          "updated_at": "2025-01-01T00:00:00Z",
+          "is_series": false,
+          "view_count": 15420
+        }
+      ]
+    }
+  }
+}
+
+{
+  "rota": "GET /api/v1/contents/series/{seriesName}/episodes",
+  "descricao": "Listar episódios de uma série específica",
+  "path_params": {
+    "seriesName": "string (nome da série)"
+  },
+  "query_params": {
+    "season": "number (opcional, temporada específica)"
+  },
+  "payload": null,
+  "resposta_sucesso": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Episódios obtidos com sucesso",
+      "data": [
+        {
+          "id": "456e7890-e89b-12d3-a456-426614174001",
+          "nome": "Breaking Bad",
+          "url_transmissao": "https://cdn.exemplo.com/bb_s1e1.m3u8",
+          "poster": "https://cdn.exemplo.com/posters/bb_s1e1.jpg",
+          "categoria": "drama",
+          "subcategoria": "serie",
+          "ativo": true,
+          "temporada": 1,
+          "episodio": 1,
+          "rating": 9.5,
+          "total_visualizations": 8930,
+          "qualidades": ["1080p", "720p"],
+          "metadata": {
+            "descricao": "Walter White descobre seu diagnóstico",
+            "duracao": 58,
+            "ano_lancamento": 2008
+          },
+          "created_at": "2025-01-01T00:00:00Z",
+          "updated_at": "2025-01-01T00:00:00Z",
+          "is_series": true,
+          "view_count": 8930
+        }
+      ]
+    }
+  }
+}
+
+{
+  "rota": "POST /api/v1/contents/{contentId}/view",
+  "descricao": "Registrar que um conteúdo foi visualizado",
+  "path_params": {
+    "contentId": "string (UUID do conteúdo)"
+  },
+  "payload": {
+    "user_id": "string (UUID do usuário - opcional)",
+    "profile_id": "string (UUID do perfil - opcional)",
+    "view_duration": "number (duração em segundos - opcional)",
+    "view_percentage": "number (porcentagem assistida 0-100 - opcional)"
+  },
+  "exemplo_payload": {
+    "user_id": "789e0123-e89b-12d3-a456-426614174002",
+    "profile_id": "abc1234d-e89b-12d3-a456-426614174003",
+    "view_duration": 3600,
+    "view_percentage": 85.5
+  },
+  "resposta_sucesso": {
+    "status": 201,
+    "body": {
+      "success": true,
+      "message": "Visualização registrada com sucesso",
+      "data": {
+        "id": "def5678e-e89b-12d3-a456-426614174004",
+        "content_id": "123e4567-e89b-12d3-a456-426614174000",
+        "user_id": "789e0123-e89b-12d3-a456-426614174002",
+        "profile_id": "abc1234d-e89b-12d3-a456-426614174003",
+        "ip_address": "192.168.1.100",
+        "user_agent": "Mozilla/5.0...",
+        "view_duration": 3600,
+        "view_percentage": 85.5,
+        "created_at": "2025-01-15T10:30:00Z"
+      }
+    }
+  },
+  "resposta_erro": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "message": "Visualização já registrada recentemente para este IP"
+    }
+  }
+}
+
+{
+  "rota": "GET /api/v1/contents",
+  "descricao": "Listar conteúdos com filtros e paginação",
+  "headers": {
+    "Authorization": "Bearer {token_jwt}"
+  },
+  "query_params": {
+    "categoria": "string (opcional)",
+    "subcategoria": "string (opcional)",
+    "ativo": "boolean (opcional)",
+    "rating_min": "number (opcional, 0-10)",
+    "rating_max": "number (opcional, 0-10)",
+    "temporada": "number (opcional)",
+    "limit": "number (opcional, padrão: 20, máximo: 100)",
+    "offset": "number (opcional, padrão: 0)",
+    "search": "string (opcional, busca no nome)",
+    "sort_by": "string (opcional: nome|rating|total_visualizations|created_at)",
+    "sort_order": "string (opcional: asc|desc)"
+  },
+  "exemplo_url": "/api/v1/contents?categoria=acao&rating_min=8&limit=10&sort_by=rating&sort_order=desc",
+  "payload": null,
+  "resposta_sucesso": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Conteúdos obtidos com sucesso",
+      "data": [
+        {
+          "id": "123e4567-e89b-12d3-a456-426614174000",
+          "nome": "John Wick 4",
+          "url_transmissao": "https://cdn.exemplo.com/johnwick4.m3u8",
+          "poster": "https://cdn.exemplo.com/posters/johnwick4.jpg",
+          "categoria": "acao",
+          "subcategoria": "filme",
+          "ativo": true,
+          "temporada": null,
+          "episodio": null,
+          "rating": 8.9,
+          "total_visualizations": 12450,
+          "qualidades": ["4k", "1080p", "720p"],
+          "metadata": {
+            "descricao": "John Wick enfrenta seus inimigos mais perigosos",
+            "duracao": 169,
+            "ano_lancamento": 2023
+          },
+          "created_at": "2025-01-01T00:00:00Z",
+          "updated_at": "2025-01-01T00:00:00Z",
+          "is_series": false,
+          "view_count": 12450
+        }
+      ],
+      "pagination": {
+        "total": 156,
+        "limit": 10,
+        "offset": 0,
+        "hasMore": true
+      }
+    }
+  }
+}
+
+{
+  "rota": "GET /api/v1/contents/{contentId}",
+  "descricao": "Obter detalhes de um conteúdo específico",
+  "headers": {
+    "Authorization": "Bearer {token_jwt}"
+  },
+  "path_params": {
+    "contentId": "string (UUID do conteúdo)"
+  },
+  "payload": null,
+  "resposta_sucesso": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Conteúdo obtido com sucesso",
+      "data": {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "nome": "Stranger Things",
+        "url_transmissao": "https://cdn.exemplo.com/st_s4e1.m3u8",
+        "poster": "https://cdn.exemplo.com/posters/st_s4e1.jpg",
+        "categoria": "ficcao_cientifica",
+        "subcategoria": "serie",
+        "ativo": true,
+        "temporada": 4,
+        "episodio": 1,
+        "rating": 9.1,
+        "total_visualizations": 25670,
+        "qualidades": ["4k", "1080p", "720p", "480p"],
+        "metadata": {
+          "descricao": "Os amigos de Hawkins enfrentam uma nova ameaça",
+          "duracao": 78,
+          "ano_lancamento": 2022,
+          "diretor": "The Duffer Brothers",
+          "elenco": ["Millie Bobby Brown", "Finn Wolfhard", "David Harbour"],
+          "idade_recomendada": "14+"
+        },
+        "created_at": "2025-01-01T00:00:00Z",
+        "updated_at": "2025-01-01T00:00:00Z",
+        "is_series": true,
+        "view_count": 25670
+      }
+    }
+  },
+  "resposta_erro": {
+    "status": 404,
+    "body": {
+      "success": false,
+      "message": "Conteúdo não encontrado"
+    }
+  }
+}
+
+Rotas Administrativas (Apenas Admin)
+
+{
+  "rota": "POST /api/v1/contents",
+  "descricao": "Criar um novo conteúdo (apenas administrador)",
+  "headers": {
+    "Authorization": "Bearer {token_jwt_admin}",
+    "Content-Type": "application/json"
+  },
+  "payload": {
+    "nome": "string (obrigatório, máximo 255 caracteres)",
+    "url_transmissao": "string (obrigatório, URL válida)",
+    "poster": "string (opcional, URL válida)",
+    "categoria": "string (obrigatório: acao|aventura|comedia|drama|terror|ficcao_cientifica|fantasia|romance|thriller|documentario|animacao|crime|guerra|historia|musica|misterio|familia|biografia)",
+    "subcategoria": "string (obrigatório: filme|serie|anime|desenho|documentario|curta|minisserie|reality_show|talk_show|esporte)",
+    "ativo": "boolean (opcional, padrão: true)",
+    "temporada": "number (obrigatório para séries)",
+    "episodio": "number (obrigatório para séries)",
+    "rating": "number (opcional, 0-10, padrão: 0)",
+    "qualidades": "array (opcional, padrão: ['auto'])",
+    "metadata": "object (opcional, dados adicionais)"
+  },
+  "exemplo_payload": {
+    "nome": "Avatar: O Caminho da Água",
+    "url_transmissao": "https://cdn.exemplo.com/avatar2.m3u8",
+    "poster": "https://cdn.exemplo.com/posters/avatar2.jpg",
+    "categoria": "ficcao_cientifica",
+    "subcategoria": "filme",
+    "ativo": true,
+    "rating": 8.7,
+    "qualidades": ["4k", "1080p", "720p"],
+    "metadata": {
+      "descricao": "Jake Sully e sua família exploram os oceanos de Pandora",
+      "duracao": 192,
+      "ano_lancamento": 2022,
+      "diretor": "James Cameron",
+      "elenco": ["Sam Worthington", "Zoe Saldana", "Sigourney Weaver"],
+      "idade_recomendada": "12+",
+      "idioma": "português",
+      "legendas": ["português", "inglês", "espanhol"]
+    }
+  },
+  "resposta_sucesso": {
+    "status": 201,
+    "body": {
+      "success": true,
+      "message": "Conteúdo criado com sucesso",
+      "data": {
+        "id": "789e0123-e89b-12d3-a456-426614174005",
+        "nome": "Avatar: O Caminho da Água",
+        "url_transmissao": "https://cdn.exemplo.com/avatar2.m3u8",
+        "poster": "https://cdn.exemplo.com/posters/avatar2.jpg",
+        "categoria": "ficcao_cientifica",
+        "subcategoria": "filme",
+        "ativo": true,
+        "temporada": null,
+        "episodio": null,
+        "rating": 8.7,
+        "total_visualizations": 0,
+        "qualidades": ["4k", "1080p", "720p"],
+        "metadata": {
+          "descricao": "Jake Sully e sua família exploram os oceanos de Pandora",
+          "duracao": 192,
+          "ano_lancamento": 2022,
+          "diretor": "James Cameron"
+        },
+        "created_at": "2025-01-15T10:30:00Z",
+        "updated_at": "2025-01-15T10:30:00Z",
+        "is_series": false,
+        "view_count": 0
+      }
+    }
+  },
+  "resposta_erro": {
+    "status": 400,
+    "body": {
+      "success": false,
+      "message": "Dados inválidos",
+      "errors": [
+        {
+          "field": "categoria",
+          "message": "Categoria deve ser uma das seguintes: acao, aventura, comedia..."
+        }
+      ]
+    }
+  }
+}
+
+{
+  "rota": "PUT /api/v1/contents/{contentId}",
+  "descricao": "Atualizar um conteúdo existente (apenas administrador)",
+  "headers": {
+    "Authorization": "Bearer {token_jwt_admin}",
+    "Content-Type": "application/json"
+  },
+  "path_params": {
+    "contentId": "string (UUID do conteúdo)"
+  },
+  "payload": {
+    "nome": "string (opcional)",
+    "url_transmissao": "string (opcional, URL válida)",
+    "poster": "string (opcional, URL válida)",
+    "categoria": "string (opcional)",
+    "subcategoria": "string (opcional)",
+    "ativo": "boolean (opcional)",
+    "temporada": "number (opcional)",
+    "episodio": "number (opcional)",
+    "rating": "number (opcional, 0-10)",
+    "qualidades": "array (opcional)",
+    "metadata": "object (opcional)"
+  },
+  "exemplo_payload": {
+    "rating": 9.2,
+    "ativo": true,
+    "metadata": {
+      "descricao": "Descrição atualizada do filme",
+      "trailer_url": "https://youtube.com/watch?v=exemplo"
+    }
+  },
+  "resposta_sucesso": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Conteúdo atualizado com sucesso",
+      "data": {
+        "id": "789e0123-e89b-12d3-a456-426614174005",
+        "nome": "Avatar: O Caminho da Água",
+        "url_transmissao": "https://cdn.exemplo.com/avatar2.m3u8",
+        "poster": "https://cdn.exemplo.com/posters/avatar2.jpg",
+        "categoria": "ficcao_cientifica",
+        "subcategoria": "filme",
+        "ativo": true,
+        "temporada": null,
+        "episodio": null,
+        "rating": 9.2,
+        "total_visualizations": 1250,
+        "qualidades": ["4k", "1080p", "720p"],
+        "metadata": {
+          "descricao": "Descrição atualizada do filme",
+          "duracao": 192,
+          "trailer_url": "https://youtube.com/watch?v=exemplo"
+        },
+        "created_at": "2025-01-15T10:30:00Z",
+        "updated_at": "2025-01-15T14:20:00Z",
+        "is_series": false,
+        "view_count": 1250
+      }
+    }
+  }
+}
+
+{
+  "rota": "DELETE /api/v1/contents/{contentId}",
+  "descricao": "Excluir um conteúdo (apenas administrador)",
+  "headers": {
+    "Authorization": "Bearer {token_jwt_admin}"
+  },
+  "path_params": {
+    "contentId": "string (UUID do conteúdo)"
+  },
+  "payload": null,
+  "resposta_sucesso": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Conteúdo excluído com sucesso"
+    }
+  },
+  "resposta_erro": {
+    "status": 404,
+    "body": {
+      "success": false,
+      "message": "Conteúdo não encontrado"
+    }
+  }
+}
+
+{
+  "rota": "GET /api/v1/contents/admin/stats",
+  "descricao": "Obter estatísticas gerais do sistema (apenas administrador)",
+  "headers": {
+    "Authorization": "Bearer {token_jwt_admin}"
+  },
+  "payload": null,
+  "resposta_sucesso": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Estatísticas obtidas com sucesso",
+      "data": {
+        "categoryStats": [
+          { "categoria": "acao", "count": 145 },
+          { "categoria": "drama", "count": 98 },
+          { "categoria": "comedia", "count": 67 },
+          { "categoria": "terror", "count": 34 }
+        ],
+        "totalViews": 2567890
+      }
+    }
+  }
+}
+
+{
+  "rota": "GET /api/v1/contents/{contentId}/stats",
+  "descricao": "Obter estatísticas detalhadas de visualização de um conteúdo (apenas administrador)",
+  "headers": {
+    "Authorization": "Bearer {token_jwt_admin}"
+  },
+  "path_params": {
+    "contentId": "string (UUID do conteúdo)"
+  },
+  "query_params": {
+    "timeRange": "string (opcional: 1d|7d|30d, padrão: 7d)"
+  },
+  "payload": null,
+  "resposta_sucesso": {
+    "status": 200,
+    "body": {
+      "success": true,
+      "message": "Estatísticas de visualização obtidas com sucesso",
+      "data": {
+        "content": {
+          "id": "123e4567-e89b-12d3-a456-426614174000",
+          "nome": "Vingadores: Ultimato",
+          "categoria": "acao",
+          "subcategoria": "filme",
+          "rating": 9.2,
+          "total_visualizations": 15420,
+          "is_series": false,
+          "view_count": 15420
+        },
+        "viewStats": [
+          {
+            "created_at": "2025-01-14T00:00:00Z",
+            "view_duration": 10800,
+            "view_percentage": 98.5
+          },
+          {
+            "created_at": "2025-01-14T02:30:00Z",
+            "view_duration": 8200,
+            "view_percentage": 75.2
+          }
+        ],
+        "uniqueViewsCount": 12045,
+        "totalViews": 15420
+      }
+    }
+  }
+}
+
+Erros de Autenticação
+
+
+{
+  "status": 401,
+  "body": {
+    "success": false,
+    "message": "Token de acesso não fornecido"
+  }
+}
+
+{
+  "status": 403,
+  "body": {
+    "success": false,
+    "message": "Acesso negado. Apenas administradores podem acessar este recurso."
+  }
+}
+
+{
+  "status": 400,
+  "body": {
+    "success": false,
+    "message": "Dados inválidos",
+    "errors": [
+      {
+        "field": "nome",
+        "message": "Nome é obrigatório"
+      },
+      {
+        "field": "url_transmissao",
+        "message": "URL de transmissão deve ser válida"
+      }
+    ]
+  }
+}
+
+{
+  "status": 429,
+  "body": {
+    "success": false,
+    "message": "Too many requests. Please try again later.",
+    "retryAfter": 3600
+  }
+}
+
+Resumo das Rotas
+Rotas Públicas
+
+GET /api/v1/contents/popular - Conteúdos populares
+GET /api/v1/contents/series/{seriesName}/episodes - Episódios de série
+POST /api/v1/contents/{contentId}/view - Registrar visualização
+
+Rotas de Usuário Autenticado
+
+GET /api/v1/contents - Listar conteúdos com filtros
+GET /api/v1/contents/{contentId} - Obter conteúdo por ID
+
+Rotas Administrativas (Admin Only)
+
+POST /api/v1/contents - Criar conteúdo
+PUT /api/v1/contents/{contentId} - Atualizar conteúdo
+DELETE /api/v1/contents/{contentId} - Excluir conteúdo
+GET /api/v1/contents/admin/stats - Estatísticas gerais
+GET /api/v1/contents/{contentId}/stats - Estatísticas de visualização
+
