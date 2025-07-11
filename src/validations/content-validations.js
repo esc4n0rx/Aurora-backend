@@ -119,16 +119,35 @@ const updateContentValidation = z.object({
     metadata: z.record(z.any()).optional()
 });
 
-// Validação para filtros de listagem
+// Validação para filtros de listagem (query parameters)
 const listContentValidation = z.object({
     categoria: z.string().optional(),
     subcategoria: z.string().optional(),
-    ativo: z.boolean().optional(),
-    rating_min: z.number().min(0).max(10).optional(),
-    rating_max: z.number().min(0).max(10).optional(),
-    temporada: z.number().int().min(1).optional(),
-    limit: z.number().int().min(1).max(100).optional().default(20),
-    offset: z.number().int().min(0).optional().default(0),
+    ativo: z.string()
+        .transform(val => val === 'true')
+        .optional(),
+    rating_min: z.string()
+        .transform(val => parseFloat(val))
+        .refine(val => !isNaN(val) && val >= 0 && val <= 10, 'Rating mínimo deve ser entre 0 e 10')
+        .optional(),
+    rating_max: z.string()
+        .transform(val => parseFloat(val))
+        .refine(val => !isNaN(val) && val >= 0 && val <= 10, 'Rating máximo deve ser entre 0 e 10')
+        .optional(),
+    temporada: z.string()
+        .transform(val => parseInt(val))
+        .refine(val => !isNaN(val) && val >= 1, 'Temporada deve ser um número maior que 0')
+        .optional(),
+    limit: z.string()
+        .transform(val => parseInt(val))
+        .refine(val => !isNaN(val) && val >= 1 && val <= 100, 'Limit deve ser entre 1 e 100')
+        .optional()
+        .default('20'),
+    offset: z.string()
+        .transform(val => parseInt(val))
+        .refine(val => !isNaN(val) && val >= 0, 'Offset deve ser maior ou igual a 0')
+        .optional()
+        .default('0'),
     search: z.string().max(255).optional(),
     sort_by: z.enum(['nome', 'rating', 'total_visualizations', 'created_at']).optional().default('created_at'),
     sort_order: z.enum(['asc', 'desc']).optional().default('desc')

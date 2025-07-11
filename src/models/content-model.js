@@ -173,31 +173,46 @@ class ContentModel {
      * Obter estatísticas de conteúdo
      */
     static async getStats() {
-        // Total de conteúdos por categoria
-        const { data: categoryStats, error: categoryError } = await supabaseAdmin
-            .from('contents')
-            .select('categoria, count(*)')
-            .eq('ativo', true);
+        try {
+            // Buscar todos os conteúdos ativos e agrupar por categoria manualmente
+            const { data: contents, error: contentsError } = await supabaseAdmin
+                .from('contents')
+                .select('categoria, total_visualizations')
+                .eq('ativo', true);
 
-        if (categoryError) {
-            throw categoryError;
+            if (contentsError) {
+                throw contentsError;
+            }
+
+            // Agrupar por categoria manualmente
+            const categoryStats = {};
+            let totalViews = 0;
+
+            contents.forEach(content => {
+                // Contar por categoria
+                if (categoryStats[content.categoria]) {
+                    categoryStats[content.categoria]++;
+                } else {
+                    categoryStats[content.categoria] = 1;
+                }
+
+                // Somar visualizações
+                totalViews += content.total_visualizations || 0;
+            });
+
+            // Converter objeto para array no formato esperado
+            const categoryStatsArray = Object.entries(categoryStats).map(([categoria, count]) => ({
+                categoria,
+                count
+            }));
+
+            return {
+                categoryStats: categoryStatsArray,
+                totalViews
+            };
+        } catch (error) {
+            throw error;
         }
-
-        // Total de visualizações
-        const { data: viewStats, error: viewError } = await supabaseAdmin
-            .from('contents')
-            .select('total_visualizations.sum()')
-            .eq('ativo', true)
-            .single();
-
-        if (viewError && viewError.code !== 'PGRST116') {
-            throw viewError;
-        }
-
-        return {
-            categoryStats,
-            totalViews: viewStats?.sum || 0
-        };
     }
 }
 
