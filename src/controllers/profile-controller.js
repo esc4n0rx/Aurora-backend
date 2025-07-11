@@ -1,4 +1,6 @@
 const ProfileService = require('../services/profile-service');
+const LoggingService = require('../services/logging-service');
+const { ACTION_TYPES } = require('../utils/action-types');
 
 class ProfileController {
     /**
@@ -8,6 +10,18 @@ class ProfileController {
         try {
             const userId = req.user.userId;
             const profiles = await ProfileService.getProfilesByUserId(userId);
+            
+            // Log da ação
+            await LoggingService.logUserAction({
+                userId,
+                actionType: ACTION_TYPES.PROFILE_ACCESS,
+                description: 'User profiles listed',
+                metadata: {
+                    profilesCount: profiles.length
+                },
+                request: req,
+                statusCode: 200
+            });
             
             res.json({
                 success: true,
@@ -27,12 +41,42 @@ class ProfileController {
             const userId = req.user.userId;
             const profile = await ProfileService.createProfile(userId, req.body);
             
+            // Log da criação de perfil
+            await LoggingService.logUserAction({
+                userId,
+                profileId: profile.id,
+                actionType: ACTION_TYPES.PROFILE_CREATE,
+                description: 'New profile created',
+                metadata: {
+                    profileName: profile.nome,
+                    profileType: profile.tipo,
+                    hasPassword: !!req.body.senha,
+                    avatarId: profile.avatar_id
+                },
+                request: req,
+                statusCode: 201
+            });
+            
             res.status(201).json({
                 success: true,
                 message: 'Perfil criado com sucesso',
                 data: profile
             });
         } catch (error) {
+            // Log da falha na criação
+            await LoggingService.logUserAction({
+                userId: req.user.userId,
+                actionType: ACTION_TYPES.PROFILE_CREATE,
+                description: 'Profile creation failed',
+                metadata: {
+                    profileName: req.body.nome,
+                    profileType: req.body.tipo,
+                    error: error.message
+                },
+                request: req,
+                statusCode: 400
+            });
+            
             if (error.message.includes('Limite máximo') || 
                 error.message.includes('inválido')) {
                 return res.status(400).json({
@@ -54,12 +98,40 @@ class ProfileController {
             
             const profile = await ProfileService.updateProfile(userId, profileId, req.body);
             
+            // Log da atualização
+            await LoggingService.logUserAction({
+                userId,
+                profileId,
+                actionType: ACTION_TYPES.PROFILE_UPDATE,
+                description: 'Profile updated',
+                metadata: {
+                    updatedFields: Object.keys(req.body),
+                    profileName: profile.nome
+                },
+                request: req,
+                statusCode: 200
+            });
+            
             res.json({
                 success: true,
                 message: 'Perfil atualizado com sucesso',
                 data: profile
             });
         } catch (error) {
+            // Log da falha na atualização
+            await LoggingService.logUserAction({
+                userId: req.user.userId,
+                profileId: req.params.profileId,
+                actionType: ACTION_TYPES.PROFILE_UPDATE,
+                description: 'Profile update failed',
+                metadata: {
+                    updatedFields: Object.keys(req.body),
+                    error: error.message
+                },
+                request: req,
+                statusCode: 400
+            });
+            
             if (error.message.includes('não encontrado') || 
                 error.message.includes('não pertence') ||
                 error.message.includes('inválido')) {
@@ -82,11 +154,37 @@ class ProfileController {
             
             const result = await ProfileService.deleteProfile(userId, profileId);
             
+            // Log da exclusão
+            await LoggingService.logUserAction({
+                userId,
+                profileId,
+                actionType: ACTION_TYPES.PROFILE_DELETE,
+                description: 'Profile deleted',
+                metadata: {
+                    soft_delete: true
+                },
+                request: req,
+                statusCode: 200
+            });
+            
             res.json({
                 success: true,
                 message: result.message
             });
         } catch (error) {
+            // Log da falha na exclusão
+            await LoggingService.logUserAction({
+                userId: req.user.userId,
+                profileId: req.params.profileId,
+                actionType: ACTION_TYPES.PROFILE_DELETE,
+                description: 'Profile deletion failed',
+                metadata: {
+                    error: error.message
+                },
+                request: req,
+                statusCode: 400
+            });
+            
             if (error.message.includes('não encontrado') || 
                 error.message.includes('não pertence') ||
                 error.message.includes('último perfil')) {
@@ -117,12 +215,40 @@ class ProfileController {
 
             const profile = await ProfileService.updateAvatar(userId, profileId, avatar_id);
             
+            // Log da atualização de avatar
+            await LoggingService.logUserAction({
+                userId,
+                profileId,
+                actionType: ACTION_TYPES.AVATAR_UPDATE,
+                description: 'Profile avatar updated',
+                metadata: {
+                    newAvatarId: avatar_id,
+                    profileName: profile.nome
+                },
+                request: req,
+                statusCode: 200
+            });
+            
             res.json({
                 success: true,
                 message: 'Avatar atualizado com sucesso',
                 data: profile
             });
         } catch (error) {
+            // Log da falha na atualização do avatar
+            await LoggingService.logUserAction({
+                userId: req.user.userId,
+                profileId: req.params.profileId,
+                actionType: ACTION_TYPES.AVATAR_UPDATE,
+                description: 'Avatar update failed',
+                metadata: {
+                    avatarId: req.body.avatar_id,
+                    error: error.message
+                },
+                request: req,
+                statusCode: 400
+            });
+            
             if (error.message.includes('não encontrado') || 
                 error.message.includes('não pertence') ||
                 error.message.includes('inválido')) {
@@ -143,6 +269,19 @@ class ProfileController {
             const { category } = req.query;
             const avatars = await ProfileService.getAvailableAvatars(category);
             
+            // Log da listagem de avatares
+            await LoggingService.logUserAction({
+                userId: req.user?.userId || null, // Pode ser chamado sem autenticação
+                actionType: ACTION_TYPES.AVATARS_LIST,
+                description: 'Available avatars listed',
+                metadata: {
+                    category: category || 'all',
+                    avatarsCount: avatars.length
+                },
+                request: req,
+                statusCode: 200
+            });
+            
             res.json({
                 success: true,
                 message: 'Avatares disponíveis obtidos com sucesso',
@@ -161,12 +300,40 @@ class ProfileController {
             const { profileId, senha } = req.body;
             const profile = await ProfileService.authenticateProfile(profileId, senha);
             
+            // Log da autenticação de perfil
+            await LoggingService.logUserAction({
+                userId: req.user.userId,
+                profileId,
+                actionType: ACTION_TYPES.PROFILE_AUTHENTICATE,
+                description: 'Profile authenticated successfully',
+                metadata: {
+                    profileName: profile.nome,
+                    hasPassword: !!senha
+                },
+                request: req,
+                statusCode: 200
+            });
+            
             res.json({
                 success: true,
                 message: 'Perfil autenticado com sucesso',
                 data: profile
             });
         } catch (error) {
+            // Log da falha na autenticação
+            await LoggingService.logUserAction({
+                userId: req.user.userId,
+                profileId: req.body.profileId,
+                actionType: ACTION_TYPES.PROFILE_AUTHENTICATE,
+                description: 'Profile authentication failed',
+                metadata: {
+                    error: error.message,
+                    passwordProvided: !!req.body.senha
+                },
+                request: req,
+                statusCode: 401
+            });
+            
             if (error.message.includes('não encontrado') || error.message.includes('Senha incorreta')) {
                 return res.status(401).json({
                     success: false,
@@ -191,6 +358,20 @@ class ProfileController {
                     message: 'Perfil não encontrado'
                 });
             }
+
+            // Log do acesso ao perfil específico
+            await LoggingService.logUserAction({
+                userId: req.user.userId,
+                profileId,
+                actionType: ACTION_TYPES.PROFILE_ACCESS,
+                description: 'Specific profile accessed',
+                metadata: {
+                    profileName: profile.nome,
+                    profileType: profile.tipo
+                },
+                request: req,
+                statusCode: 200
+            });
 
             // Remover senha da resposta
             const { senha: _, ...profileWithoutPassword } = profile;
