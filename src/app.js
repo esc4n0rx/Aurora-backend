@@ -14,6 +14,8 @@ const { logHealthCheck, logDocsAccess } = require('./middlewares/logging-middlew
 const authRoutes = require('./routes/auth-routes');
 const profileRoutes = require('./routes/profile-routes');
 const contentRoutes = require('./routes/content-routes');
+const adminRoutes = require('./routes/admin-routes'); // Nova rota
+const healthRoutes = require('./routes/health-routes'); // Nova rota
 
 // Importar logger
 const { logger } = require('./config/logger');
@@ -67,7 +69,7 @@ if (process.env.NODE_ENV === 'development') {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Rota de health check com log
+// Rota de health check básico (compatibilidade com versão anterior)
 app.get('/health', logHealthCheck, (req, res) => {
     res.json({
         success: true,
@@ -86,7 +88,12 @@ app.get('/', logDocsAccess, (req, res) => {
         success: true,
         message: 'Bem-vindo à API Aurora+',
         documentation: {
-            health: 'GET /health',
+            health: {
+                basic: 'GET /health',
+                detailed: 'GET /api/v1/health/full',
+                readiness: 'GET /api/v1/health/ready',
+                liveness: 'GET /api/v1/health/live'
+            },
             auth: {
                 register: 'POST /api/v1/auth/register',
                 login: 'POST /api/v1/auth/login',
@@ -113,6 +120,23 @@ app.get('/', logDocsAccess, (req, res) => {
                 seriesEpisodes: 'GET /api/v1/contents/series/:seriesName/episodes',
                 stats: 'GET /api/v1/contents/admin/stats (Admin only)',
                 viewStats: 'GET /api/v1/contents/:contentId/stats (Admin only)'
+            },
+            admin: {
+                users: {
+                    list: 'GET /api/v1/admin/users (Admin only)',
+                    details: 'GET /api/v1/admin/users/:userId (Admin only)',
+                    block: 'POST /api/v1/admin/users/:userId/block (Admin only)',
+                    unblock: 'POST /api/v1/admin/users/:userId/unblock (Admin only)',
+                    delete: 'DELETE /api/v1/admin/users/:userId (Admin only)',
+                    restore: 'POST /api/v1/admin/users/:userId/restore (Admin only)'
+                },
+                logs: {
+                    list: 'GET /api/v1/admin/logs (Admin only)',
+                    stats: 'GET /api/v1/admin/logs/stats (Admin only)'
+                },
+                system: {
+                    stats: 'GET /api/v1/admin/stats (Admin only)'
+                }
             }
         }
     });
@@ -122,6 +146,8 @@ app.get('/', logDocsAccess, (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/profiles', profileRoutes);
 app.use('/api/v1/contents', contentRoutes);
+app.use('/api/v1/admin', adminRoutes); // Nova rota administrativa
+app.use('/api/v1/health', healthRoutes); // Nova rota de health
 
 // Middleware de tratamento de rotas não encontradas
 app.use((req, res, next) => {

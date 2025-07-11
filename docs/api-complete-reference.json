@@ -1,0 +1,1317 @@
+{
+  "api_documentation": {
+    "title": "Aurora+ API - Documentação Completa",
+    "version": "1.0.0",
+    "base_url": "http://localhost:3000/api/v1",
+    "authentication": {
+      "type": "Bearer Token",
+      "header": "Authorization: Bearer {jwt_token}",
+      "admin_required": "Token deve pertencer ao usuário configurado em ADMIN_USER_ID"
+    }
+  },
+  "routes": {
+    "authentication": {
+      "register": {
+        "method": "POST",
+        "path": "/auth/register",
+        "description": "Registrar novo usuário",
+        "requires_auth": false,
+        "payload": {
+          "nome": "João Silva",
+          "email": "joao@exemplo.com",
+          "senha": "123456",
+          "data_nascimento": "1990-01-01"
+        },
+        "response_success": {
+          "status": 201,
+          "body": {
+            "success": true,
+            "message": "Usuário registrado com sucesso",
+            "data": {
+              "user": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "nome": "João Silva",
+                "email": "joao@exemplo.com",
+                "data_nascimento": "1990-01-01",
+                "created_at": "2025-01-15T10:30:00Z",
+                "updated_at": "2025-01-15T10:30:00Z"
+              },
+              "profiles": [
+                {
+                  "id": "456e7890-e89b-12d3-a456-426614174001",
+                  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                  "nome": "João",
+                  "tipo": "principal",
+                  "avatar_id": "default-profile",
+                  "avatar_url": "/assets/avatars/default-profile.png",
+                  "is_active": true,
+                  "created_at": "2025-01-15T10:30:00Z"
+                },
+                {
+                  "id": "789e0123-e89b-12d3-a456-426614174002",
+                  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                  "nome": "João Kids",
+                  "tipo": "kids",
+                  "avatar_id": "default-kids",
+                  "avatar_url": "/assets/avatars/default-kids.png",
+                  "is_active": true,
+                  "created_at": "2025-01-15T10:30:00Z"
+                }
+              ],
+              "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            }
+          }
+        },
+        "response_error": {
+          "status": 400,
+          "body": {
+            "success": false,
+            "message": "Este email já está cadastrado"
+          }
+        }
+      },
+      "login": {
+        "method": "POST",
+        "path": "/auth/login",
+        "description": "Login do usuário",
+        "requires_auth": false,
+        "payload": {
+          "email": "joao@exemplo.com",
+          "senha": "123456"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Login realizado com sucesso",
+            "data": {
+              "user": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "nome": "João Silva",
+                "email": "joao@exemplo.com",
+                "data_nascimento": "1990-01-01",
+                "created_at": "2025-01-15T10:30:00Z",
+                "updated_at": "2025-01-15T10:30:00Z"
+              },
+              "profiles": [
+                {
+                  "id": "456e7890-e89b-12d3-a456-426614174001",
+                  "nome": "João",
+                  "tipo": "principal"
+                }
+              ],
+              "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            }
+          }
+        },
+        "response_error": {
+          "status": 401,
+          "body": {
+            "success": false,
+            "message": "Email ou senha inválidos"
+          }
+        }
+      },
+      "check_email": {
+        "method": "POST",
+        "path": "/auth/check-email",
+        "description": "Verificar se email já existe",
+        "requires_auth": false,
+        "payload": {
+          "email": "joao@exemplo.com"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Verificação de email realizada",
+            "data": {
+              "exists": true
+            }
+          }
+        }
+      }
+    },
+    "profiles": {
+      "list_profiles": {
+        "method": "GET",
+        "path": "/profiles",
+        "description": "Listar perfis do usuário",
+        "requires_auth": true,
+        "payload": null,
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Perfis obtidos com sucesso",
+            "data": [
+              {
+                "id": "456e7890-e89b-12d3-a456-426614174001",
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "nome": "João",
+                "tipo": "principal",
+                "avatar_id": "default-profile",
+                "avatar_url": "/assets/avatars/default-profile.png",
+                "is_active": true,
+                "created_at": "2025-01-15T10:30:00Z",
+                "updated_at": "2025-01-15T10:30:00Z"
+              }
+            ]
+          }
+        }
+      },
+      "create_profile": {
+        "method": "POST",
+        "path": "/profiles",
+        "description": "Criar novo perfil",
+        "requires_auth": true,
+        "payload": {
+          "nome": "Maria",
+          "tipo": "principal",
+          "senha": "1234",
+          "avatar_id": "avatar-woman-1"
+        },
+        "response_success": {
+          "status": 201,
+          "body": {
+            "success": true,
+            "message": "Perfil criado com sucesso",
+            "data": {
+              "id": "abc1234d-e89b-12d3-a456-426614174003",
+              "user_id": "123e4567-e89b-12d3-a456-426614174000",
+              "nome": "Maria",
+              "tipo": "principal",
+              "avatar_id": "avatar-woman-1",
+              "avatar_url": "/assets/avatars/avatar-woman-1.png",
+              "is_active": true,
+              "created_at": "2025-01-15T10:30:00Z",
+              "updated_at": "2025-01-15T10:30:00Z"
+            }
+          }
+        }
+      },
+      "get_profile": {
+        "method": "GET",
+        "path": "/profiles/{profileId}",
+        "description": "Obter perfil por ID",
+        "requires_auth": true,
+        "payload": null,
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Perfil obtido com sucesso",
+            "data": {
+              "id": "456e7890-e89b-12d3-a456-426614174001",
+              "user_id": "123e4567-e89b-12d3-a456-426614174000",
+              "nome": "João",
+              "tipo": "principal",
+              "avatar_id": "default-profile",
+              "avatar_url": "/assets/avatars/default-profile.png",
+              "is_active": true,
+              "created_at": "2025-01-15T10:30:00Z",
+              "updated_at": "2025-01-15T10:30:00Z"
+            }
+          }
+        }
+      },
+      "update_profile": {
+        "method": "PUT",
+        "path": "/profiles/{profileId}",
+        "description": "Atualizar perfil",
+        "requires_auth": true,
+        "payload": {
+          "nome": "João Carlos",
+          "senha": "novaSenha123",
+          "avatar_id": "avatar-man-2"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Perfil atualizado com sucesso",
+            "data": {
+              "id": "456e7890-e89b-12d3-a456-426614174001",
+              "nome": "João Carlos",
+              "avatar_id": "avatar-man-2",
+              "avatar_url": "/assets/avatars/avatar-man-2.png",
+              "updated_at": "2025-01-15T11:00:00Z"
+            }
+          }
+        }
+      },
+      "delete_profile": {
+        "method": "DELETE",
+        "path": "/profiles/{profileId}",
+        "description": "Excluir perfil",
+        "requires_auth": true,
+        "payload": null,
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Perfil excluído com sucesso"
+          }
+        }
+      },
+      "update_avatar": {
+        "method": "PUT",
+        "path": "/profiles/{profileId}/avatar",
+        "description": "Atualizar avatar do perfil",
+        "requires_auth": true,
+        "payload": {
+          "avatar_id": "avatar-woman-3"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Avatar atualizado com sucesso",
+            "data": {
+              "id": "456e7890-e89b-12d3-a456-426614174001",
+              "nome": "João",
+              "avatar_id": "avatar-woman-3",
+              "avatar_url": "/assets/avatars/avatar-woman-3.png",
+              "updated_at": "2025-01-15T11:15:00Z"
+            }
+          }
+        }
+      },
+      "authenticate_profile": {
+        "method": "POST",
+        "path": "/profiles/authenticate",
+        "description": "Autenticar perfil com senha",
+        "requires_auth": true,
+        "payload": {
+          "profileId": "456e7890-e89b-12d3-a456-426614174001",
+          "senha": "1234"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Perfil autenticado com sucesso",
+            "data": {
+              "id": "456e7890-e89b-12d3-a456-426614174001",
+              "nome": "João",
+              "tipo": "principal",
+              "avatar_url": "/assets/avatars/default-profile.png"
+            }
+          }
+        }
+      },
+      "get_avatars": {
+        "method": "GET",
+        "path": "/profiles/avatars",
+        "description": "Listar avatares disponíveis",
+        "requires_auth": false,
+        "query_params": {
+          "category": "all|kids|principal|general"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Avatares disponíveis obtidos com sucesso",
+            "data": [
+              {
+                "id": "default-profile",
+                "filename": "default-profile.png",
+                "url": "/assets/avatars/default-profile.png",
+                "category": "principal",
+                "isDefault": true
+              },
+              {
+                "id": "avatar-man-1",
+                "filename": "avatar-man-1.png",
+                "url": "/assets/avatars/avatar-man-1.png",
+                "category": "general",
+                "isDefault": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    "content": {
+      "list_contents": {
+        "method": "GET",
+        "path": "/contents",
+        "description": "Listar conteúdos com filtros",
+        "requires_auth": true,
+        "query_params": {
+          "categoria": "acao|aventura|comedia|drama|terror|ficcao_cientifica|fantasia|romance|thriller|documentario|animacao|crime|guerra|historia|musica|misterio|familia|biografia",
+          "subcategoria": "filme|serie|anime|desenho|documentario|curta|minisserie|reality_show|talk_show|esporte",
+          "ativo": "true|false",
+          "rating_min": "0-10",
+          "rating_max": "0-10",
+          "temporada": "number",
+          "limit": "1-100",
+          "offset": "number",
+          "search": "string",
+          "sort_by": "nome|rating|total_visualizations|created_at",
+          "sort_order": "asc|desc"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Conteúdos obtidos com sucesso",
+            "data": [
+              {
+                "id": "def5678e-e89b-12d3-a456-426614174004",
+                "nome": "Vingadores: Ultimato",
+                "url_transmissao": "https://cdn.exemplo.com/vingadores.m3u8",
+                "poster": "https://cdn.exemplo.com/posters/vingadores.jpg",
+                "categoria": "acao",
+                "subcategoria": "filme",
+                "ativo": true,
+                "temporada": null,
+                "episodio": null,
+                "rating": 9.2,
+                "total_visualizations": 15420,
+                "qualidades": ["4k", "1080p", "720p"],
+                "metadata": {
+                  "descricao": "A batalha final contra Thanos",
+                  "duracao": 181,
+                  "ano_lancamento": 2019,
+                  "diretor": "Anthony Russo, Joe Russo"
+                },
+                "created_at": "2025-01-01T00:00:00Z",
+                "updated_at": "2025-01-01T00:00:00Z",
+                "is_series": false,
+                "view_count": 15420
+              }
+            ],
+            "pagination": {
+              "total": 156,
+              "limit": 20,
+              "offset": 0,
+              "hasMore": true
+            }
+          }
+        }
+      },
+      "get_content": {
+        "method": "GET",
+        "path": "/contents/{contentId}",
+        "description": "Obter conteúdo por ID",
+        "requires_auth": true,
+        "payload": null,
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Conteúdo obtido com sucesso",
+            "data": {
+              "id": "def5678e-e89b-12d3-a456-426614174004",
+              "nome": "Stranger Things",
+              "url_transmissao": "https://cdn.exemplo.com/st_s4e1.m3u8",
+              "poster": "https://cdn.exemplo.com/posters/st_s4e1.jpg",
+              "categoria": "ficcao_cientifica",
+              "subcategoria": "serie",
+              "ativo": true,
+              "temporada": 4,
+              "episodio": 1,
+              "rating": 9.1,
+              "total_visualizations": 25670,
+              "qualidades": ["4k", "1080p", "720p", "480p"],
+              "metadata": {
+                "descricao": "Os amigos de Hawkins enfrentam uma nova ameaça",
+                "duracao": 78,
+                "ano_lancamento": 2022,
+                "diretor": "The Duffer Brothers",
+                "elenco": ["Millie Bobby Brown", "Finn Wolfhard", "David Harbour"],
+                "idade_recomendada": "14+"
+              },
+              "created_at": "2025-01-01T00:00:00Z",
+              "updated_at": "2025-01-01T00:00:00Z",
+              "is_series": true,
+              "view_count": 25670
+            }
+          }
+        }
+      },
+      "get_popular": {
+        "method": "GET",
+        "path": "/contents/popular",
+        "description": "Obter conteúdos mais populares",
+        "requires_auth": false,
+        "query_params": {
+          "limit": "1-50"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Conteúdos populares obtidos com sucesso",
+            "data": [
+              {
+                "id": "def5678e-e89b-12d3-a456-426614174004",
+                "nome": "Vingadores: Ultimato",
+                "poster": "https://cdn.exemplo.com/posters/vingadores.jpg",
+                "categoria": "acao",
+                "subcategoria": "filme",
+                "rating": 9.2,
+                "total_visualizations": 15420,
+                "is_series": false,
+                "view_count": 15420
+              }
+            ]
+          }
+        }
+      },
+      "get_series_episodes": {
+        "method": "GET",
+        "path": "/contents/series/{seriesName}/episodes",
+        "description": "Obter episódios de uma série",
+        "requires_auth": false,
+        "query_params": {
+          "season": "number"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Episódios obtidos com sucesso",
+            "data": [
+              {
+                "id": "ghi9012f-e89b-12d3-a456-426614174005",
+                "nome": "Breaking Bad",
+                "url_transmissao": "https://cdn.exemplo.com/bb_s1e1.m3u8",
+                "poster": "https://cdn.exemplo.com/posters/bb_s1e1.jpg",
+                "categoria": "drama",
+                "subcategoria": "serie",
+                "temporada": 1,
+                "episodio": 1,
+                "rating": 9.5,
+                "total_visualizations": 8930,
+                "is_series": true,
+                "view_count": 8930
+              }
+            ]
+          }
+        }
+      },
+      "record_view": {
+        "method": "POST",
+        "path": "/contents/{contentId}/view",
+        "description": "Registrar visualização de conteúdo",
+        "requires_auth": false,
+        "payload": {
+          "user_id": "123e4567-e89b-12d3-a456-426614174000",
+          "profile_id": "456e7890-e89b-12d3-a456-426614174001",
+          "view_duration": 3600,
+          "view_percentage": 85.5
+        },
+        "response_success": {
+          "status": 201,
+          "body": {
+            "success": true,
+            "message": "Visualização registrada com sucesso",
+            "data": {
+              "id": "jkl3456g-e89b-12d3-a456-426614174006",
+              "content_id": "def5678e-e89b-12d3-a456-426614174004",
+              "user_id": "123e4567-e89b-12d3-a456-426614174000",
+              "profile_id": "456e7890-e89b-12d3-a456-426614174001",
+              "ip_address": "192.168.1.100",
+              "view_duration": 3600,
+              "view_percentage": 85.5,
+              "created_at": "2025-01-15T10:30:00Z"
+            }
+          }
+        }
+      },
+      "create_content": {
+        "method": "POST",
+        "path": "/contents",
+        "description": "Criar novo conteúdo (Admin only)",
+        "requires_auth": true,
+        "requires_admin": true,
+        "payload": {
+          "nome": "Avatar: O Caminho da Água",
+          "url_transmissao": "https://cdn.exemplo.com/avatar2.m3u8",
+          "poster": "https://cdn.exemplo.com/posters/avatar2.jpg",
+          "categoria": "ficcao_cientifica",
+          "subcategoria": "filme",
+          "ativo": true,
+          "rating": 8.7,
+          "qualidades": ["4k", "1080p", "720p"],
+          "metadata": {
+            "descricao": "Jake Sully e sua família exploram os oceanos de Pandora",
+            "duracao": 192,
+            "ano_lancamento": 2022,
+            "diretor": "James Cameron",
+            "elenco": ["Sam Worthington", "Zoe Saldana", "Sigourney Weaver"],
+            "idade_recomendada": "12+",
+            "idioma": "português",
+            "legendas": ["português", "inglês", "espanhol"]
+          }
+        },
+        "response_success": {
+          "status": 201,
+          "body": {
+            "success": true,
+            "message": "Conteúdo criado com sucesso",
+            "data": {
+              "id": "mno7890h-e89b-12d3-a456-426614174007",
+              "nome": "Avatar: O Caminho da Água",
+              "url_transmissao": "https://cdn.exemplo.com/avatar2.m3u8",
+              "poster": "https://cdn.exemplo.com/posters/avatar2.jpg",
+              "categoria": "ficcao_cientifica",
+              "subcategoria": "filme",
+              "ativo": true,
+              "rating": 8.7,
+              "total_visualizations": 0,
+              "qualidades": ["4k", "1080p", "720p"],
+              "metadata": {
+                "descricao": "Jake Sully e sua família exploram os oceanos de Pandora",
+                "duracao": 192,
+                "ano_lancamento": 2022,
+                "diretor": "James Cameron"
+              },
+              "created_at": "2025-01-15T10:30:00Z",
+              "updated_at": "2025-01-15T10:30:00Z",
+              "is_series": false,
+              "view_count": 0
+            }
+          }
+        }
+      },
+      "update_content": {
+        "method": "PUT",
+        "path": "/contents/{contentId}",
+        "description": "Atualizar conteúdo (Admin only)",
+        "requires_auth": true,
+        "requires_admin": true,
+        "payload": {
+          "rating": 9.2,
+          "ativo": true,
+          "metadata": {
+            "descricao": "Descrição atualizada do filme",
+            "trailer_url": "https://youtube.com/watch?v=exemplo"
+          }
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Conteúdo atualizado com sucesso",
+            "data": {
+              "id": "mno7890h-e89b-12d3-a456-426614174007",
+              "nome": "Avatar: O Caminho da Água",
+              "rating": 9.2,
+              "ativo": true,
+              "total_visualizations": 1250,
+              "metadata": {
+                "descricao": "Descrição atualizada do filme",
+                "trailer_url": "https://youtube.com/watch?v=exemplo"
+              },
+              "updated_at": "2025-01-15T14:20:00Z"
+            }
+          }
+        }
+      },
+      "delete_content": {
+        "method": "DELETE",
+        "path": "/contents/{contentId}",
+        "description": "Excluir conteúdo (Admin only)",
+        "requires_auth": true,
+        "requires_admin": true,
+        "payload": null,
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Conteúdo excluído com sucesso"
+          }
+        }
+      },
+      "get_content_stats": {
+        "method": "GET",
+        "path": "/contents/admin/stats",
+        "description": "Obter estatísticas gerais de conteúdo (Admin only)",
+        "requires_auth": true,
+        "requires_admin": true,
+        "payload": null,
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Estatísticas obtidas com sucesso",
+            "data": {
+              "categoryStats": [
+                { "categoria": "acao", "count": 145 },
+                { "categoria": "drama", "count": 98 },
+                { "categoria": "comedia", "count": 67 }
+              ],
+              "totalViews": 2567890
+            }
+          }
+        }
+      },
+      "get_content_view_stats": {
+        "method": "GET",
+        "path": "/contents/{contentId}/stats",
+        "description": "Obter estatísticas de visualização de um conteúdo (Admin only)",
+        "requires_auth": true,
+        "requires_admin": true,
+        "query_params": {
+          "timeRange": "1d|7d|30d"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Estatísticas de visualização obtidas com sucesso",
+            "data": {
+              "content": {
+                "id": "def5678e-e89b-12d3-a456-426614174004",
+                "nome": "Vingadores: Ultimato",
+                "categoria": "acao",
+                "total_visualizations": 15420
+              },
+              "viewStats": [
+                {
+                  "created_at": "2025-01-14T00:00:00Z",
+                  "view_duration": 10800,
+                  "view_percentage": 98.5
+                }
+              ],
+              "uniqueViewsCount": 12045,
+              "totalViews": 15420
+            }
+          }
+        }
+      }
+    },
+    "admin": {
+      "list_users": {
+        "method": "GET",
+        "path": "/admin/users",
+        "description": "Listar usuários (Admin only)",
+        "requires_auth": true,
+        "requires_admin": true,
+        "query_params": {
+          "limit": "1-100",
+          "offset": "number",
+          "search": "string",
+          "status": "all|active|blocked|deleted",
+          "sort_by": "nome|email|created_at|last_activity",
+          "sort_order": "asc|desc"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Usuários obtidos com sucesso",
+            "data": [
+              {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "nome": "João Silva",
+                "email": "joao@exemplo.com",
+                "data_nascimento": "1990-01-01",
+                "is_blocked": false,
+                "is_deleted": false,
+                "blocked_reason": null,
+                "blocked_at": null,
+                "blocked_by": null,
+                "deleted_at": null,
+                "deleted_by": null,
+                "profiles_count": 2,
+                "actions_count": 145,
+                "last_activity": "2025-01-15T10:30:00Z",
+                "created_at": "2025-01-01T00:00:00Z",
+                "updated_at": "2025-01-15T10:30:00Z"
+              }
+            ],
+            "pagination": {
+              "total": 156,
+              "limit": 20,
+              "offset": 0,
+              "hasMore": true
+            }
+          }
+        }
+      },
+      "get_user_details": {
+        "method": "GET",
+        "path": "/admin/users/{userId}",
+        "description": "Obter detalhes de um usuário (Admin only)",
+        "requires_auth": true,
+        "requires_admin": true,
+        "payload": null,
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Detalhes do usuário obtidos com sucesso",
+            "data": {
+              "id": "123e4567-e89b-12d3-a456-426614174000",
+              "nome": "João Silva",
+              "email": "joao@exemplo.com",
+              "data_nascimento": "1990-01-01",
+              "is_blocked": false,
+              "is_deleted": false,
+              "profiles_count": 2,
+              "actions_count": 145,
+              "last_activity": "2025-01-15T10:30:00Z",
+              "created_at": "2025-01-01T00:00:00Z",
+              "updated_at": "2025-01-15T10:30:00Z"
+            }
+          }
+        }
+      },
+      "block_user": {
+        "method": "POST",
+        "path": "/admin/users/{userId}/block",
+        "description": "Bloquear usuário (Admin only)",
+        "requires_auth": true,
+        "requires_admin": true,
+        "payload": {
+          "reason": "Violação dos termos de uso - comportamento inadequado"
+        },
+        "response_success": {
+          "status": 200,
+          "body": {
+            "success": true,
+            "message": "Usuário bloqueado com sucesso",
+            "data": {
+              "id": "123e4567-e89b-12d3-a456-426614174000",
+              "nome": "João Silva",
+              "email": "joao@exemplo.com",
+              "is_blocked": true,
+              "blocked_reason": "Violação dos termos de uso - comportamento inadequado",
+              "blocked_at": "2025-01-15T11:00:00Z",
+              "blocked_by": "admin-user-id-123",
+             "updated_at": "2025-01-15T11:00:00Z"
+           }
+         }
+       }
+     },
+     "unblock_user": {
+       "method": "POST",
+       "path": "/admin/users/{userId}/unblock",
+       "description": "Desbloquear usuário (Admin only)",
+       "requires_auth": true,
+       "requires_admin": true,
+       "payload": null,
+       "response_success": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "message": "Usuário desbloqueado com sucesso",
+           "data": {
+             "id": "123e4567-e89b-12d3-a456-426614174000",
+             "nome": "João Silva",
+             "email": "joao@exemplo.com",
+             "is_blocked": false,
+             "blocked_reason": null,
+             "blocked_at": null,
+             "blocked_by": null,
+             "updated_at": "2025-01-15T11:30:00Z"
+           }
+         }
+       }
+     },
+     "delete_user": {
+       "method": "DELETE",
+       "path": "/admin/users/{userId}",
+       "description": "Remover usuário (soft delete) (Admin only)",
+       "requires_auth": true,
+       "requires_admin": true,
+       "payload": null,
+       "response_success": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "message": "Usuário removido com sucesso",
+           "data": {
+             "id": "123e4567-e89b-12d3-a456-426614174000",
+             "nome": "João Silva",
+             "email": "joao@exemplo.com",
+             "is_deleted": true,
+             "deleted_at": "2025-01-15T12:00:00Z",
+             "deleted_by": "admin-user-id-123",
+             "updated_at": "2025-01-15T12:00:00Z"
+           }
+         }
+       }
+     },
+     "restore_user": {
+       "method": "POST",
+       "path": "/admin/users/{userId}/restore",
+       "description": "Restaurar usuário removido (Admin only)",
+       "requires_auth": true,
+       "requires_admin": true,
+       "payload": null,
+       "response_success": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "message": "Usuário restaurado com sucesso",
+           "data": {
+             "id": "123e4567-e89b-12d3-a456-426614174000",
+             "nome": "João Silva",
+             "email": "joao@exemplo.com",
+             "is_deleted": false,
+             "deleted_at": null,
+             "deleted_by": null,
+             "updated_at": "2025-01-15T12:30:00Z"
+           }
+         }
+       }
+     },
+     "get_logs": {
+       "method": "GET",
+       "path": "/admin/logs",
+       "description": "Obter logs do sistema (Admin only)",
+       "requires_auth": true,
+       "requires_admin": true,
+       "query_params": {
+         "limit": "1-200",
+         "offset": "number",
+         "userId": "uuid",
+         "actionCategory": "auth|profile|content|system|security|admin",
+         "actionType": "string",
+         "startDate": "2025-01-01T00:00:00Z",
+         "endDate": "2025-01-15T23:59:59Z",
+         "ipAddress": "192.168.1.100",
+         "statusCode": "200"
+       },
+       "response_success": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "message": "Logs obtidos com sucesso",
+           "data": [
+             {
+               "id": "pqr1234i-e89b-12d3-a456-426614174008",
+               "user_id": "123e4567-e89b-12d3-a456-426614174000",
+               "profile_id": "456e7890-e89b-12d3-a456-426614174001",
+               "action_type": "user_login",
+               "action_category": "auth",
+               "description": "User logged in successfully",
+               "metadata": {
+                 "email": "joao@exemplo.com",
+                 "profilesCount": 2
+               },
+               "ip_address": "192.168.1.100",
+               "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+               "request_id": "req-12345-abcde",
+               "endpoint": "/api/v1/auth/login",
+               "method": "POST",
+               "status_code": 200,
+               "response_time_ms": 145,
+               "created_at": "2025-01-15T10:30:00Z",
+               "users": {
+                 "nome": "João Silva",
+                 "email": "joao@exemplo.com"
+               },
+               "profiles": {
+                 "nome": "João"
+               }
+             },
+             {
+               "id": "stu5678j-e89b-12d3-a456-426614174009",
+               "user_id": "123e4567-e89b-12d3-a456-426614174000",
+               "profile_id": null,
+               "action_type": "content_view",
+               "action_category": "content",
+               "description": "Content view recorded",
+               "metadata": {
+                 "contentId": "def5678e-e89b-12d3-a456-426614174004",
+                 "viewDuration": 3600,
+                 "viewPercentage": 85.5
+               },
+               "ip_address": "192.168.1.100",
+               "user_agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)",
+               "endpoint": "/api/v1/contents/def5678e-e89b-12d3-a456-426614174004/view",
+               "method": "POST",
+               "status_code": 201,
+               "response_time_ms": 89,
+               "created_at": "2025-01-15T11:45:00Z",
+               "users": {
+                 "nome": "João Silva",
+                 "email": "joao@exemplo.com"
+               },
+               "profiles": null
+             }
+           ],
+           "pagination": {
+             "total": 25430,
+             "limit": 50,
+             "offset": 0,
+             "hasMore": true
+           }
+         }
+       }
+     },
+     "get_logs_stats": {
+       "method": "GET",
+       "path": "/admin/logs/stats",
+       "description": "Obter estatísticas de logs (Admin only)",
+       "requires_auth": true,
+       "requires_admin": true,
+       "query_params": {
+         "timeRange": "1d|7d|30d|90d"
+       },
+       "response_success": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "message": "Estatísticas de logs obtidas com sucesso",
+           "data": {
+             "actionStats": [
+               { "action_category": "auth", "count": 1250 },
+               { "action_category": "content", "count": 8930 },
+               { "action_category": "profile", "count": 450 },
+               { "action_category": "admin", "count": 89 },
+               { "action_category": "security", "count": 12 }
+             ],
+             "topUsers": [
+               {
+                 "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                 "users": {
+                   "nome": "João Silva",
+                   "email": "joao@exemplo.com"
+                 },
+                 "count": 245
+               },
+               {
+                 "user_id": "vwx9012k-e89b-12d3-a456-426614174010",
+                 "users": {
+                   "nome": "Maria Santos",
+                   "email": "maria@exemplo.com"
+                 },
+                 "count": 189
+               }
+             ],
+             "topIPs": [
+               {
+                 "ip_address": "192.168.1.100",
+                 "count": 456
+               },
+               {
+                 "ip_address": "10.0.0.25",
+                 "count": 234
+               }
+             ],
+             "timeRange": "7d"
+           }
+         }
+       }
+     },
+     "get_system_stats": {
+       "method": "GET",
+       "path": "/admin/stats",
+       "description": "Obter estatísticas gerais do sistema (Admin only)",
+       "requires_auth": true,
+       "requires_admin": true,
+       "payload": null,
+       "response_success": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "message": "Estatísticas do sistema obtidas com sucesso",
+           "data": {
+             "users": {
+               "total": 1250,
+               "active": 1180,
+               "blocked": 15,
+               "deleted": 55,
+               "newLastWeek": 45
+             },
+             "content": {
+               "categoryStats": [
+                 { "categoria": "acao", "count": 145 },
+                 { "categoria": "drama", "count": 98 },
+                 { "categoria": "comedia", "count": 67 },
+                 { "categoria": "terror", "count": 34 }
+               ],
+               "totalViews": 2567890
+             },
+             "activity": {
+               "actionsLast24h": 2340,
+               "actionsLast7d": 15670,
+               "uniqueIPsLast24h": 890
+             },
+             "timestamp": "2025-01-15T12:00:00Z"
+           }
+         }
+       }
+     }
+   },
+   "health": {
+     "basic_health": {
+       "method": "GET",
+       "path": "/health",
+       "description": "Health check básico (compatibilidade)",
+       "requires_auth": false,
+       "payload": null,
+       "response_success": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "message": "Aurora+ API está funcionando",
+           "timestamp": "2025-01-15T12:00:00Z",
+           "environment": "production",
+           "version": "1.0.0",
+           "uptime": 86400,
+           "memory": {
+             "rss": 134217728,
+             "heapTotal": 67108864,
+             "heapUsed": 33554432,
+             "external": 16777216
+           }
+         }
+       }
+     },
+     "health_ready": {
+       "method": "GET",
+       "path": "/health/ready",
+       "description": "Readiness probe para Kubernetes",
+       "requires_auth": false,
+       "payload": null,
+       "response_success": {
+         "status": 200,
+         "body": {
+           "status": "ready"
+         }
+       },
+       "response_error": {
+         "status": 503,
+         "body": {
+           "status": "not ready"
+         }
+       }
+     },
+     "health_live": {
+       "method": "GET",
+       "path": "/health/live",
+       "description": "Liveness probe para Kubernetes",
+       "requires_auth": false,
+       "payload": null,
+       "response_success": {
+         "status": 200,
+         "body": {
+           "status": "alive",
+           "uptime": 86400
+         }
+       }
+     },
+     "full_health": {
+       "method": "GET",
+       "path": "/health/full",
+       "description": "Health check completo com métricas detalhadas",
+       "requires_auth": true,
+       "payload": null,
+       "response_success": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "status": "healthy",
+           "timestamp": "2025-01-15T12:00:00Z",
+           "responseTime": 156,
+           "version": "1.0.0",
+           "environment": "production",
+           "system": {
+             "platform": "linux",
+             "architecture": "x64",
+             "hostname": "aurora-api-01",
+             "uptime": 86400,
+             "nodeVersion": "v18.17.0",
+             "processUptime": 3600,
+             "environment": "production"
+           },
+           "resources": {
+             "memory": {
+               "total": 4096,
+               "free": 2048,
+               "used": 2048,
+               "usage": 50.0,
+               "process": {
+                 "rss": 128,
+                 "heapTotal": 64,
+                 "heapUsed": 32,
+                 "external": 16
+               }
+             },
+             "cpu": {
+               "usage": 15.5,
+               "cores": 4,
+               "model": "Intel(R) Core(TM) i7-9750H CPU @ 2.60GHz"
+             },
+             "disk": {
+               "available": "N/A",
+               "message": "Disk monitoring requires additional package"
+             }
+           },
+           "services": {
+             "database": {
+               "status": "healthy",
+               "message": "Database connection successful",
+               "responseTime": 23
+             }
+           },
+           "application": {
+             "users": {
+               "total": 1250,
+               "active": 1180,
+               "blocked": 15
+             },
+             "profiles": {
+               "total": 2500,
+               "active": 2450
+             },
+             "content": {
+               "total": 850,
+               "active": 820
+             },
+             "actions": {
+               "total": 125000,
+               "last24h": 2340
+             }
+           }
+         }
+       },
+       "response_warning": {
+         "status": 200,
+         "body": {
+           "success": true,
+           "status": "warning",
+           "timestamp": "2025-01-15T12:00:00Z",
+           "responseTime": 4500,
+           "message": "High response time detected",
+           "services": {
+             "database": {
+               "status": "healthy",
+               "message": "Database connection successful",
+               "responseTime": 4200
+             }
+           }
+         }
+       },
+       "response_critical": {
+         "status": 503,
+         "body": {
+           "success": false,
+           "status": "critical",
+           "timestamp": "2025-01-15T12:00:00Z",
+           "message": "Database connection failed",
+           "services": {
+             "database": {
+               "status": "unhealthy",
+               "message": "Connection timeout",
+               "responseTime": null
+             }
+           }
+         }
+       }
+     }
+   }
+ },
+ "error_responses": {
+   "validation_error": {
+     "status": 400,
+     "body": {
+       "success": false,
+       "message": "Dados inválidos",
+       "errors": [
+         {
+           "field": "email",
+           "message": "Email inválido"
+         },
+         {
+           "field": "senha",
+           "message": "Senha deve ter pelo menos 6 caracteres"
+         }
+       ]
+     }
+   },
+   "unauthorized": {
+     "status": 401,
+     "body": {
+       "success": false,
+       "message": "Token de acesso não fornecido"
+     }
+   },
+   "forbidden_admin": {
+     "status": 403,
+     "body": {
+       "success": false,
+       "message": "Acesso negado. Apenas administradores podem acessar este recurso."
+     }
+   },
+   "not_found": {
+     "status": 404,
+     "body": {
+       "success": false,
+       "message": "Recurso não encontrado"
+     }
+   },
+   "rate_limit": {
+     "status": 429,
+     "body": {
+       "success": false,
+       "message": "Too many requests. Please try again later.",
+       "retryAfter": 3600
+     }
+   },
+   "server_error": {
+     "status": 500,
+     "body": {
+       "success": false,
+       "message": "Erro interno do servidor"
+     }
+   }
+ },
+ "examples": {
+   "curl_commands": {
+     "register": "curl -X POST http://localhost:3000/api/v1/auth/register -H 'Content-Type: application/json' -d '{\"nome\":\"João Silva\",\"email\":\"joao@exemplo.com\",\"senha\":\"123456\",\"data_nascimento\":\"1990-01-01\"}'",
+     "login": "curl -X POST http://localhost:3000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"joao@exemplo.com\",\"senha\":\"123456\"}'",
+     "list_profiles": "curl -X GET http://localhost:3000/api/v1/profiles -H 'Authorization: Bearer YOUR_JWT_TOKEN'",
+     "create_profile": "curl -X POST http://localhost:3000/api/v1/profiles -H 'Authorization: Bearer YOUR_JWT_TOKEN' -H 'Content-Type: application/json' -d '{\"nome\":\"Maria\",\"tipo\":\"principal\",\"senha\":\"1234\"}'",
+     "list_contents": "curl -X GET 'http://localhost:3000/api/v1/contents?categoria=acao&limit=10' -H 'Authorization: Bearer YOUR_JWT_TOKEN'",
+     "get_popular": "curl -X GET 'http://localhost:3000/api/v1/contents/popular?limit=5'",
+     "record_view": "curl -X POST http://localhost:3000/api/v1/contents/CONTENT_ID/view -H 'Content-Type: application/json' -d '{\"user_id\":\"USER_ID\",\"view_duration\":3600}'",
+     "admin_list_users": "curl -X GET 'http://localhost:3000/api/v1/admin/users?status=active&limit=20' -H 'Authorization: Bearer YOUR_ADMIN_TOKEN'",
+     "admin_block_user": "curl -X POST http://localhost:3000/api/v1/admin/users/USER_ID/block -H 'Authorization: Bearer YOUR_ADMIN_TOKEN' -H 'Content-Type: application/json' -d '{\"reason\":\"Violação dos termos\"}'",
+     "admin_logs": "curl -X GET 'http://localhost:3000/api/v1/admin/logs?actionCategory=auth&limit=50' -H 'Authorization: Bearer YOUR_ADMIN_TOKEN'",
+     "health_check": "curl -X GET http://localhost:3000/api/v1/health/full -H 'Authorization: Bearer YOUR_TOKEN'"
+   },
+   "javascript_fetch": {
+     "login": "const response = await fetch('/api/v1/auth/login', {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    email: 'joao@exemplo.com',\n    senha: '123456'\n  })\n});\nconst data = await response.json();",
+     "authenticated_request": "const response = await fetch('/api/v1/profiles', {\n  method: 'GET',\n  headers: {\n    'Authorization': `Bearer ${localStorage.getItem('token')}`,\n    'Content-Type': 'application/json'\n  }\n});\nconst data = await response.json();"
+   }
+ },
+ "status_codes": {
+   "200": "Sucesso",
+   "201": "Criado com sucesso",
+   "400": "Dados inválidos ou erro de validação",
+   "401": "Não autenticado - token ausente ou inválido",
+   "403": "Acesso negado - não tem permissão (admin required)",
+   "404": "Recurso não encontrado",
+   "429": "Rate limit excedido - muitas requisições",
+   "500": "Erro interno do servidor",
+   "503": "Serviço indisponível - health check failed"
+ },
+ "rate_limiting": {
+   "description": "Sistema detecta atividade suspeita baseado em IP",
+   "threshold": "100 requisições por hora por IP",
+   "response": "429 Too Many Requests",
+   "retry_after": "3600 segundos (1 hora)"
+ },
+ "logging": {
+   "description": "Todas as ações são registradas no sistema de logs",
+   "categories": ["auth", "profile", "content", "system", "security", "admin"],
+   "logged_data": [
+     "Tipo de ação",
+     "ID do usuário e perfil",
+     "IP e User-Agent",
+     "Endpoint e método HTTP",
+     "Status code e tempo de resposta",
+     "Metadados específicos da ação"
+   ]
+ }
+}
