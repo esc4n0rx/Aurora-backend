@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
+const path = require('path');
 require('dotenv').config();
 
 // Importar middlewares
@@ -9,12 +10,16 @@ const errorHandler = require('./middlewares/error-handler');
 
 // Importar rotas
 const authRoutes = require('./routes/auth-routes');
+const profileRoutes = require('./routes/profile-routes');
 
 const app = express();
 
 // Middlewares de segurança
 app.use(helmet());
 app.use(cors());
+
+// Servir arquivos estáticos (imagens padrão)
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // Middleware de logging
 app.use(morgan(process.env.NODE_ENV === 'development' ? 'dev' : 'combined'));
@@ -45,6 +50,15 @@ app.get('/', (req, res) => {
                 register: 'POST /api/v1/auth/register',
                 login: 'POST /api/v1/auth/login',
                 checkEmail: 'POST /api/v1/auth/check-email'
+            },
+            profiles: {
+                list: 'GET /api/v1/profiles',
+                create: 'POST /api/v1/profiles',
+                get: 'GET /api/v1/profiles/:profileId',
+                update: 'PUT /api/v1/profiles/:profileId',
+                delete: 'DELETE /api/v1/profiles/:profileId',
+                updateAvatar: 'PUT /api/v1/profiles/:profileId/avatar',
+                authenticate: 'POST /api/v1/profiles/authenticate'
             }
         }
     });
@@ -52,21 +66,14 @@ app.get('/', (req, res) => {
 
 // Rotas da API
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/profiles', profileRoutes);
 
 // Middleware de tratamento de rotas não encontradas
-// Captura todas as rotas não definidas
 app.use((req, res, next) => {
     res.status(404).json({
         success: false,
         message: `Rota ${req.method} ${req.originalUrl} não encontrada`,
-        suggestion: 'Verifique a documentação da API',
-        availableEndpoints: [
-            'GET /',
-            'GET /health',
-            'POST /api/v1/auth/register',
-            'POST /api/v1/auth/login',
-            'POST /api/v1/auth/check-email'
-        ]
+        suggestion: 'Verifique a documentação da API'
     });
 });
 

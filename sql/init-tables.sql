@@ -13,9 +13,11 @@ CREATE TABLE users (
 CREATE TABLE profiles (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    nome VARCHAR(100) NOT NULL,
+    nome VARCHAR(50) NOT NULL,
     tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('principal', 'kids')),
-    avatar_url VARCHAR(500),
+    avatar_id VARCHAR(100), -- ID do avatar selecionado
+    avatar_url VARCHAR(500), -- URL completa do avatar
+    senha VARCHAR(255), -- Senha específica do perfil (opcional)
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
@@ -25,6 +27,8 @@ CREATE TABLE profiles (
 CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_profiles_user_id ON profiles(user_id);
 CREATE INDEX idx_profiles_tipo ON profiles(tipo);
+CREATE INDEX idx_profiles_is_active ON profiles(is_active);
+CREATE INDEX idx_profiles_avatar_id ON profiles(avatar_id);
 
 -- Trigger para atualizar updated_at automaticamente
 CREATE OR REPLACE FUNCTION update_updated_at_column()
