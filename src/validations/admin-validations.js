@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const { isValidIP } = require('../utils/validation-utils');
 
 // Validação para listagem de usuários
 const listUsersValidation = z.object({
@@ -26,7 +27,11 @@ const logsFiltersValidation = z.object({
     actionType: z.string().max(100).optional(),
     startDate: z.string().datetime().optional(),
     endDate: z.string().datetime().optional(),
-    ipAddress: z.string().ip().optional(),
+    ipAddress: z.string()
+        .refine(isValidIP, {
+            message: 'Endereço IP inválido'
+        })
+        .optional(),
     statusCode: z.number().int().min(100).max(599).optional()
 });
 
