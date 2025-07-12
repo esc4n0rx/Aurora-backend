@@ -1,0 +1,435 @@
+{
+    "api_documentation": {
+      "title": "Aurora+ Torrent Streaming API - Documentação Completa",
+      "version": "1.0.0",
+      "description": "API para streaming de conteúdo via torrents com cache inteligente e otimizações de performance",
+      "base_url": "http://localhost:3000/api/v1",
+      "features": [
+        "Streaming direto de torrents (magnet links)",
+        "Cache inteligente para reutilização de streams",
+        "Suporte completo a HTTP Ranges (seek/navegação)",
+        "Rate limiting por IP",
+        "Cleanup automático de recursos",
+        "Logs e métricas detalhadas"
+      ]
+    },
+    "authentication": {
+      "type": "Bearer Token",
+      "header": "Authorization: Bearer {jwt_token}",
+      "note": "Algumas rotas de streaming são públicas para compatibilidade com players de vídeo"
+    },
+    "routes": {
+      "streaming": {
+        "start_torrent_stream": {
+          "method": "POST",
+          "path": "/stream/content/{contentId}/start",
+          "description": "Iniciar streaming de um conteúdo torrent",
+          "requires_auth": true,
+          "path_params": {
+            "contentId": "string (UUID do conteúdo)"
+          },
+          "payload": null,
+          "headers": {
+            "Authorization": "Bearer {jwt_token}",
+            "Content-Type": "application/json"
+          },
+          "response_success": {
+            "status": 201,
+            "body": {
+              "success": true,
+              "message": "Stream iniciado com sucesso",
+              "data": {
+                "streamId": "a1b2c3d4e5f6",
+                "filename": "Avengers.Endgame.2019.1080p.BluRay.x264.mkv",
+                "fileSize": 2547896320,
+                "streamUrl": "/api/v1/stream/a1b2c3d4e5f6/video",
+                "progress": 0,
+                "contentType": "video/x-matroska"
+              }
+            }
+          },
+          "response_error": {
+            "torrent_not_found": {
+              "status": 400,
+              "body": {
+                "success": false,
+                "message": "Conteúdo não é um torrent"
+              }
+            },
+            "content_inactive": {
+              "status": 400,
+              "body": {
+                "success": false,
+                "message": "Conteúdo não está ativo"
+              }
+            },
+            "no_video_file": {
+              "status": 400,
+              "body": {
+                "success": false,
+                "message": "Nenhum arquivo de vídeo encontrado no torrent"
+              }
+            }
+          },
+          "curl_example": "curl -X POST 'http://localhost:3000/api/v1/stream/content/123e4567-e89b-12d3-a456-426614174000/start' \\\n  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' \\\n  -H 'Content-Type: application/json'"
+        },
+        "stream_video": {
+          "method": "GET",
+          "path": "/stream/{streamId}/video",
+          "description": "Stream direto do arquivo de vídeo com suporte a HTTP Ranges",
+          "requires_auth": false,
+          "path_params": {
+            "streamId": "string (ID único do stream)"
+          },
+          "headers": {
+            "Range": "bytes=0-1023 (opcional, para navegação no vídeo)",
+            "User-Agent": "Mozilla/5.0... (obrigatório, para validação de cliente)"
+          },
+          "response_success": {
+            "full_stream": {
+              "status": 200,
+              "headers": {
+                "Content-Type": "video/x-matroska",
+                "Content-Length": "2547896320",
+                "Accept-Ranges": "bytes",
+                "Cache-Control": "public, max-age=3600",
+                "X-Content-Type-Options": "nosniff"
+              },
+              "body": "[BINARY VIDEO STREAM DATA]"
+            },
+            "range_request": {
+              "status": 206,
+              "headers": {
+                "Content-Type": "video/x-matroska",
+                "Content-Range": "bytes 0-1023/2547896320",
+                "Content-Length": "1024",
+                "Accept-Ranges": "bytes"
+              },
+              "body": "[PARTIAL BINARY VIDEO STREAM DATA]"
+            }
+          },
+          "response_error": {
+            "stream_not_found": {
+              "status": 404,
+              "body": {
+                "success": false,
+                "message": "Stream não encontrado"
+              }
+            },
+            "invalid_client": {
+              "status": 400,
+              "body": {
+                "success": false,
+                "message": "Cliente não suporta streaming de vídeo"
+              }
+            },
+            "rate_limit": {
+              "status": 429,
+              "body": {
+                "success": false,
+                "message": "Limite de streams simultâneos excedido",
+                "retryAfter": 600
+              }
+            }
+          },
+          "curl_example": "curl -H 'Range: bytes=0-1048575' \\\n  'http://localhost:3000/api/v1/stream/a1b2c3d4e5f6/video'",
+          "html5_video_example": "<video controls>\n  <source src=\"/api/v1/stream/a1b2c3d4e5f6/video\" type=\"video/mp4\">\n  Seu navegador não suporta o elemento de vídeo.\n</video>",
+          "javascript_example": "const video = document.getElementById('player');\nvideo.src = '/api/v1/stream/a1b2c3d4e5f6/video';\nvideo.load();\nvideo.play();"
+        },
+        "stream_content_direct": {
+          "method": "GET",
+          "path": "/stream/content/{contentId}/play",
+          "description": "Stream direto de conteúdo (auto-detecta torrent vs URL externa)",
+          "requires_auth": true,
+          "path_params": {
+            "contentId": "string (UUID do conteúdo)"
+          },
+          "headers": {
+            "Authorization": "Bearer {jwt_token}",
+            "Range": "bytes=0-1023 (opcional)"
+          },
+          "response_success": {
+            "torrent_redirect": {
+              "status": 302,
+              "headers": {
+                "Location": "/api/v1/stream/a1b2c3d4e5f6/video"
+              }
+            },
+            "external_redirect": {
+              "status": 302,
+              "headers": {
+                "Location": "https://external-cdn.com/video.m3u8"
+              }
+            }
+          },
+          "curl_example": "curl -L -H 'Authorization: Bearer TOKEN' \\\n  'http://localhost:3000/api/v1/stream/content/123e4567-e89b-12d3-a456-426614174000/play'"
+        },
+        "get_stream_info": {
+          "method": "GET",
+          "path": "/stream/{streamId}/info",
+          "description": "Obter informações detalhadas do stream",
+          "requires_auth": true,
+          "path_params": {
+            "streamId": "string (ID único do stream)"
+          },
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "response_success": {
+            "status": 200,
+            "body": {
+              "success": true,
+              "message": "Informações do stream obtidas com sucesso",
+              "data": {
+                "streamId": "a1b2c3d4e5f6",
+                "filename": "Avengers.Endgame.2019.1080p.BluRay.x264.mkv",
+                "fileSize": 2547896320,
+                "progress": 45,
+                "downloadSpeed": 1048576,
+                "uploadSpeed": 524288,
+                "peers": 12,
+                "activeConnections": 3,
+                "createdAt": "2025-01-15T10:30:00Z",
+                "lastAccessed": "2025-01-15T11:45:00Z"
+              }
+            }
+          },
+          "curl_example": "curl -H 'Authorization: Bearer TOKEN' \\\n  'http://localhost:3000/api/v1/stream/a1b2c3d4e5f6/info'"
+        },
+        "stop_stream": {
+          "method": "DELETE",
+          "path": "/stream/{streamId}",
+          "description": "Parar um stream ativo (apenas se não há conexões ativas)",
+          "requires_auth": true,
+          "path_params": {
+            "streamId": "string (ID único do stream)"
+          },
+          "headers": {
+            "Authorization": "Bearer {jwt_token}"
+          },
+          "response_success": {
+            "status": 200,
+            "body": {
+              "success": true,
+              "message": "Stream parado com sucesso"
+            }
+          },
+          "curl_example": "curl -X DELETE -H 'Authorization: Bearer TOKEN' \\\n  'http://localhost:3000/api/v1/stream/a1b2c3d4e5f6'"
+        },
+        "get_streaming_stats": {
+          "method": "GET",
+          "path": "/stream/admin/stats",
+          "description": "Obter estatísticas de streaming (Admin only)",
+          "requires_auth": true,
+          "requires_admin": true,
+          "headers": {
+            "Authorization": "Bearer {admin_jwt_token}"
+          },
+          "response_success": {
+            "status": 200,
+            "body": {
+              "success": true,
+              "message": "Estatísticas de streaming obtidas com sucesso",
+              "data": {
+                "client": {
+                  "torrents": 5,
+                  "downloadSpeed": 2097152,
+                  "uploadSpeed": 1048576,
+                  "ratio": 1.5
+                },
+                "cache": {
+                  "totalStreams": 5,
+                  "maxCacheSize": 10,
+                  "totalActiveConnections": 12,
+                  "oldestStreamAge": 1800000,
+                  "memoryUsage": {
+                    "rss": 134217728,
+                    "heapTotal": 67108864,
+                    "heapUsed": 33554432,
+                    "external": 16777216
+                  }
+                }
+              }
+            }
+          },
+          "curl_example": "curl -H 'Authorization: Bearer ADMIN_TOKEN' \\\n  'http://localhost:3000/api/v1/stream/admin/stats'"
+        }
+      }
+    },
+    "use_cases": {
+      "web_player": {
+        "title": "Player de Vídeo Web",
+        "description": "Integração com player HTML5 para streaming direto",
+        "steps": [
+          {
+            "step": 1,
+            "action": "POST /stream/content/{contentId}/start",
+            "description": "Iniciar stream do torrent",
+            "payload": null,
+            "expected_response": "streamId e streamUrl"
+          },
+          {
+            "step": 2,
+            "action": "GET /stream/{streamId}/video",
+            "description": "Configurar source do elemento <video>",
+            "implementation": "<video controls><source src='/api/v1/stream/{streamId}/video' type='video/mp4'></video>"
+          },
+          {
+            "step": 3,
+            "action": "GET /stream/{streamId}/info (opcional)",
+            "description": "Monitorar progresso do download",
+            "frequency": "A cada 5-10 segundos"
+          }
+        ],
+        "javascript_implementation": {
+          "start_stream": "async function startStream(contentId) {\n  const response = await fetch(`/api/v1/stream/content/${contentId}/start`, {\n    method: 'POST',\n    headers: {\n      'Authorization': `Bearer ${token}`,\n      'Content-Type': 'application/json'\n    }\n  });\n  const data = await response.json();\n  return data.data.streamId;\n}",
+          "setup_player": "function setupPlayer(streamId) {\n  const video = document.getElementById('player');\n  video.src = `/api/v1/stream/${streamId}/video`;\n  video.load();\n}",
+          "monitor_progress": "async function monitorProgress(streamId) {\n  const response = await fetch(`/api/v1/stream/${streamId}/info`, {\n    headers: { 'Authorization': `Bearer ${token}` }\n  });\n  const data = await response.json();\n  console.log(`Download progress: ${data.data.progress}%`);\n}"
+        }
+      },
+      "mobile_app": {
+        "title": "Aplicativo Mobile",
+        "description": "Streaming para aplicativos Android/iOS",
+        "considerations": [
+          "Use ExoPlayer (Android) ou AVPlayer (iOS) com suporte a HTTP ranges",
+          "Implemente buffer personalizado para melhor UX",
+          "Monitore conexão de rede para ajustar qualidade",
+          "Cache metadados do stream para acesso offline"
+        ],
+        "android_example": "// ExoPlayer com suporte a ranges\nMediaItem mediaItem = MediaItem.fromUri(\"/api/v1/stream/\" + streamId + \"/video\");\nexoPlayer.setMediaItem(mediaItem);\nexoPlayer.prepare();\nexoPlayer.play();",
+        "ios_example": "// AVPlayer com URL de stream\nlet url = URL(string: \"/api/v1/stream/\\(streamId)/video\")!\nlet playerItem = AVPlayerItem(url: url)\nlet player = AVPlayer(playerItem: playerItem)\nplayer.play()"
+      },
+      "external_player": {
+        "title": "Player Externo (VLC, MPV, etc)",
+        "description": "Streaming para players externos via URL direta",
+        "workflow": [
+          "Iniciar stream via API",
+          "Obter streamUrl da resposta",
+          "Abrir URL no player externo"
+        ],
+        "vlc_command": "vlc \"http://localhost:3000/api/v1/stream/a1b2c3d4e5f6/video\"",
+        "mpv_command": "mpv \"http://localhost:3000/api/v1/stream/a1b2c3d4e5f6/video\"",
+        "notes": [
+          "Players externos podem não enviar header Authorization",
+          "URLs de stream são públicas após criação",
+          "Rate limiting aplicado por IP"
+        ]
+      }
+    },
+    "technical_specifications": {
+      "supported_formats": {
+        "input": ["magnet links (magnet:?xt=urn:btih:...)"],
+        "video_output": [".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v"],
+        "streaming_protocols": ["HTTP/1.1 with Ranges", "HTTP/2"]
+      },
+      "performance_optimizations": {
+        "cache_strategy": "In-memory cache com TTL configurável",
+        "download_strategy": "Sequential download para streaming otimizado",
+        "chunk_size": "Adaptativo baseado no tamanho do arquivo (64KB-1MB)",
+        "cleanup": "Automático baseado em inatividade e TTL"
+      },
+      "rate_limiting": {
+        "per_ip": "10 streams simultâneos",
+        "time_window": "10 minutos",
+        "bypass": "Headers de autorização válidos"
+      },
+      "security": {
+        "cors": "Configurado para players de vídeo",
+        "headers": [
+          "X-Content-Type-Options: nosniff",
+          "X-Frame-Options: SAMEORIGIN",
+          "Referrer-Policy: strict-origin-when-cross-origin"
+        ],
+        "validation": "User-Agent obrigatório para streaming"
+      }
+    },
+    "environment_variables": {
+      "required": [
+        {
+          "name": "TORRENT_MAX_CACHE_SIZE",
+          "description": "Número máximo de streams no cache",
+          "default": "10",
+          "type": "integer"
+        },
+        {
+          "name": "TORRENT_CACHE_TTL",
+          "description": "TTL do cache em milissegundos",
+          "default": "3600000",
+          "type": "integer",
+          "note": "3600000 = 1 hora"
+        }
+      ]
+    },
+    "monitoring_and_logs": {
+      "logged_actions": [
+        "stream_start",
+        "stream_access", 
+        "stream_stop",
+        "torrent_download",
+        "rate_limit_hit"
+      ],
+      "metrics": [
+        "Download/upload speed",
+        "Number of peers",
+        "Progress percentage",
+        "Active connections per stream",
+        "Cache hit/miss ratio"
+      ],
+      "health_checks": [
+        "WebTorrent client status",
+        "Cache memory usage",
+        "Active streams count"
+      ]
+    },
+    "error_handling": {
+      "torrent_errors": {
+        "timeout": "30 segundos para torrent ficar pronto",
+        "no_peers": "Tentativa de reconexão automática",
+        "corrupted_data": "Re-download automático de chunks corrompidos"
+      },
+      "stream_errors": {
+        "connection_lost": "Cleanup automático de recursos",
+        "client_disconnect": "Liberação de conexão no cache",
+        "file_not_ready": "Aguarda download de chunk necessário"
+      }
+    },
+    "status_codes": {
+      "200": "Sucesso - Stream completo",
+      "201": "Stream iniciado com sucesso", 
+      "206": "Partial Content - Range request",
+      "302": "Redirect para stream ou URL externa",
+      "400": "Dados inválidos ou cliente não suportado",
+      "401": "Não autenticado",
+      "403": "Acesso negado",
+      "404": "Stream ou conteúdo não encontrado",
+      "429": "Rate limit excedido",
+      "500": "Erro interno do servidor"
+    },
+    "testing_examples": {
+      "curl_full_workflow": {
+        "description": "Exemplo completo de uso via cURL",
+        "steps": [
+          {
+            "step": "1. Login para obter token",
+            "command": "curl -X POST http://localhost:3000/api/v1/auth/login \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"email\":\"user@test.com\",\"senha\":\"123456\"}'"
+          },
+          {
+            "step": "2. Iniciar stream",
+            "command": "curl -X POST http://localhost:3000/api/v1/stream/content/CONTENT_ID/start \\\n  -H 'Authorization: Bearer TOKEN' \\\n  -H 'Content-Type: application/json'"
+          },
+          {
+            "step": "3. Testar stream (primeiros 1MB)",
+            "command": "curl -H 'Range: bytes=0-1048575' \\\n  'http://localhost:3000/api/v1/stream/STREAM_ID/video' \\\n  --output test_chunk.bin"
+          },
+          {
+            "step": "4. Verificar informações",
+            "command": "curl -H 'Authorization: Bearer TOKEN' \\\n  'http://localhost:3000/api/v1/stream/STREAM_ID/info'"
+          }
+        ]
+      },
+      "browser_testing": {
+        "description": "Teste no navegador com HTML5",
+        "html": "<!DOCTYPE html>\n<html>\n<head>\n  <title>Aurora+ Stream Test</title>\n</head>\n<body>\n  <video id=\"player\" controls width=\"800\" height=\"450\">\n    <source src=\"/api/v1/stream/STREAM_ID/video\" type=\"video/mp4\">\n  </video>\n  <div id=\"info\"></div>\n  \n  <script>\n    const video = document.getElementById('player');\n    const info = document.getElementById('info');\n    \n    video.addEventListener('loadstart', () => {\n      info.textContent = 'Carregando...';\n    });\n    \n    video.addEventListener('canplay', () => {\n      info.textContent = 'Pronto para reproduzir';\n    });\n    \n    video.addEventListener('progress', () => {\n      const buffered = video.buffered;\n      if (buffered.length > 0) {\n        const percent = (buffered.end(0) / video.duration) * 100;\n        info.textContent = `Buffer: ${percent.toFixed(1)}%`;\n      }\n    });\n  </script>\n</body>\n</html>"
+      }
+    }
+  }

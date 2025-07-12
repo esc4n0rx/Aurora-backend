@@ -14,8 +14,9 @@ const { logHealthCheck, logDocsAccess } = require('./middlewares/logging-middlew
 const authRoutes = require('./routes/auth-routes');
 const profileRoutes = require('./routes/profile-routes');
 const contentRoutes = require('./routes/content-routes');
-const adminRoutes = require('./routes/admin-routes'); // Nova rota
-const healthRoutes = require('./routes/health-routes'); // Nova rota
+const streamRoutes = require('./routes/stream-routes'); // Nova rota
+const adminRoutes = require('./routes/admin-routes');
+const healthRoutes = require('./routes/health-routes');
 
 // Importar logger
 const { logger } = require('./config/logger');
@@ -28,9 +29,23 @@ if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Middlewares de segurança
-app.use(helmet());
-app.use(cors());
+// Middlewares de segurança (ajustados para streaming)
+app.use(helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // Permitir recursos cross-origin para vídeo
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            mediaSrc: ["'self'", "blob:", "data:"], // Permitir streaming de mídia
+            connectSrc: ["'self'", "ws:", "wss:"] // Permitir WebSockets para torrents
+        }
+    }
+}));
+
+app.use(cors({
+    origin: true, // Permitir qualquer origem para compatibilidade com players
+    credentials: true,
+    exposedHeaders: ['Content-Range', 'Accept-Ranges', 'Content-Length']
+}));
 
 // Configurar trust proxy para obter IP correto
 app.set('trust proxy', true);
@@ -121,6 +136,14 @@ app.get('/', logDocsAccess, (req, res) => {
                 stats: 'GET /api/v1/contents/admin/stats (Admin only)',
                 viewStats: 'GET /api/v1/contents/:contentId/stats (Admin only)'
             },
+            streaming: {
+                startStream: 'POST /api/v1/stream/content/:contentId/start',
+                streamVideo: 'GET /api/v1/stream/:streamId/video',
+                playContent: 'GET /api/v1/stream/content/:contentId/play',
+                streamInfo: 'GET /api/v1/stream/:streamId/info',
+                stopStream: 'DELETE /api/v1/stream/:streamId',
+                stats: 'GET /api/v1/stream/admin/stats (Admin only)'
+            },
             admin: {
                 users: {
                     list: 'GET /api/v1/admin/users (Admin only)',
@@ -146,8 +169,9 @@ app.get('/', logDocsAccess, (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/profiles', profileRoutes);
 app.use('/api/v1/contents', contentRoutes);
-app.use('/api/v1/admin', adminRoutes); // Nova rota administrativa
-app.use('/api/v1/health', healthRoutes); // Nova rota de health
+app.use('/api/v1/stream', streamRoutes); // Nova rota de streaming
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/health', healthRoutes);
 
 // Middleware de tratamento de rotas não encontradas
 app.use((req, res, next) => {

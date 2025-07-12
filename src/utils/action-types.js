@@ -6,6 +6,7 @@ const ACTION_CATEGORIES = {
     AUTH: 'auth',
     PROFILE: 'profile',
     CONTENT: 'content',
+    STREAMING: 'streaming', // Nova categoria
     SYSTEM: 'system',
     SECURITY: 'security',
     ADMIN: 'admin'
@@ -40,6 +41,14 @@ const ACTION_TYPES = {
     CONTENT_STATS: 'content_stats',
     CONTENT_VIEW_STATS: 'content_view_stats',
     SERIES_EPISODES: 'series_episodes',
+    
+    // === STREAMING (NOVOS) ===
+    STREAM_START: 'stream_start',
+    STREAM_ACCESS: 'stream_access',
+    STREAM_STOP: 'stream_stop',
+    STREAM_INFO: 'stream_info',
+    STREAM_STATS: 'stream_stats',
+    TORRENT_DOWNLOAD: 'torrent_download',
     
     // === SISTEMA ===
     API_HEALTH_CHECK: 'api_health_check',
@@ -99,6 +108,14 @@ const getActionCategory = (actionType) => {
         [ACTION_TYPES.CONTENT_STATS]: ACTION_CATEGORIES.CONTENT,
         [ACTION_TYPES.CONTENT_VIEW_STATS]: ACTION_CATEGORIES.CONTENT,
         [ACTION_TYPES.SERIES_EPISODES]: ACTION_CATEGORIES.CONTENT,
+        
+        // Streaming
+        [ACTION_TYPES.STREAM_START]: ACTION_CATEGORIES.STREAMING,
+        [ACTION_TYPES.STREAM_ACCESS]: ACTION_CATEGORIES.STREAMING,
+        [ACTION_TYPES.STREAM_STOP]: ACTION_CATEGORIES.STREAMING,
+        [ACTION_TYPES.STREAM_INFO]: ACTION_CATEGORIES.STREAMING,
+        [ACTION_TYPES.STREAM_STATS]: ACTION_CATEGORIES.STREAMING,
+        [ACTION_TYPES.TORRENT_DOWNLOAD]: ACTION_CATEGORIES.STREAMING,
         
         // Sistema
         [ACTION_TYPES.API_HEALTH_CHECK]: ACTION_CATEGORIES.SYSTEM,
