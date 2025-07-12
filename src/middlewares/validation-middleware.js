@@ -31,16 +31,32 @@ const validateData = (schema) => {
                 // Verificar se errors existe antes de usar map
                 const errors = error.errors ? error.errors.map(err => ({
                     field: err.path.join('.'),
-                    message: err.message
+                    message: err.message,
+                    code: err.code,
+                    received: err.received
                 })) : [{
                     field: 'unknown',
                     message: 'Erro de validação'
                 }];
 
+                // Log detalhado do erro de validação
+                console.error('Validation error details:', {
+                    originalData: dataToValidate,
+                    errors: error.errors,
+                    method: req.method,
+                    url: req.originalUrl
+                });
+
                 return res.status(400).json({
                     success: false,
                     message: 'Dados inválidos',
-                    errors: errors
+                    errors: errors,
+                    ...(process.env.NODE_ENV === 'development' && {
+                        debug: {
+                            originalData: dataToValidate,
+                            zodErrors: error.errors
+                        }
+                    })
                 });
             }
             next(error);
