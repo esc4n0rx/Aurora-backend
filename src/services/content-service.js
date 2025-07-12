@@ -1,6 +1,7 @@
 const ContentModel = require('../models/content-model');
 const ContentViewModel = require('../models/content-view-model');
 const ContentUtils = require('../utils/content-utils');
+const TorrentUtils = require('../utils/torrent-utils');
 
 class ContentService {
     /**
@@ -10,6 +11,17 @@ class ContentService {
         // Sanitizar metadados
         if (contentData.metadata) {
             contentData.metadata = ContentUtils.sanitizeMetadata(contentData.metadata);
+        }
+
+        // Validar URL de transmissão
+        if (contentData.url_transmissao) {
+            // Se for magnet link, validar formato
+            if (TorrentUtils.isMagnetLink(contentData.url_transmissao)) {
+                const hash = TorrentUtils.extractHashFromMagnet(contentData.url_transmissao);
+                if (!hash) {
+                    throw new Error('Magnet link inválido - hash não encontrado');
+                }
+            }
         }
 
         const content = await ContentModel.create(contentData);
@@ -54,6 +66,16 @@ class ContentService {
         // Sanitizar metadados se fornecidos
         if (updateData.metadata) {
             updateData.metadata = ContentUtils.sanitizeMetadata(updateData.metadata);
+        }
+
+        // Validar URL de transmissão se fornecida
+        if (updateData.url_transmissao) {
+            if (TorrentUtils.isMagnetLink(updateData.url_transmissao)) {
+                const hash = TorrentUtils.extractHashFromMagnet(updateData.url_transmissao);
+                if (!hash) {
+                    throw new Error('Magnet link inválido - hash não encontrado');
+                }
+            }
         }
 
         const content = await ContentModel.update(id, updateData);

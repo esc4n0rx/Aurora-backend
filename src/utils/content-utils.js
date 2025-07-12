@@ -1,3 +1,5 @@
+const TorrentUtils = require('./torrent-utils');
+
 class ContentUtils {
     /**
      * Categorias disponíveis
@@ -59,17 +61,32 @@ class ContentUtils {
      * Formatar dados de conteúdo para resposta
      */
     static formatContentResponse(content) {
-        return {
+        const formatted = {
             ...content,
             is_series: this.isSeries(content.subcategoria),
-            view_count: content.total_visualizations || 0
+            view_count: content.total_visualizations || 0,
+            is_torrent: TorrentUtils.isMagnetLink(content.url_transmissao)
         };
+
+        // Adicionar informações de streaming se for torrent
+        if (formatted.is_torrent) {
+            formatted.stream_id = TorrentUtils.generateStreamId(content.url_transmissao);
+            formatted.torrent_hash = TorrentUtils.extractHashFromMagnet(content.url_transmissao);
+        }
+
+        return formatted;
     }
 
     /**
      * Validar URL de transmissão
      */
     static isValidStreamingUrl(url) {
+        // Aceitar magnet links
+        if (TorrentUtils.isMagnetLink(url)) {
+            return TorrentUtils.extractHashFromMagnet(url) !== null;
+        }
+
+        // Validar URLs HTTP/HTTPS normais
         try {
             const parsedUrl = new URL(url);
             return ['http:', 'https:', 'rtmp:', 'rtmps:'].includes(parsedUrl.protocol);
