@@ -97,9 +97,9 @@ class ContentService {
     }
 
     /**
-     * Registrar visualização
+     * Registrar visualização (CORRIGIDO para permitir re-assistir)
      */
-    static async recordView(contentId, viewData, ipAddress, userAgent) {
+    static async recordView(contentId, viewData, ipAddress, userAgent, forceNew = false) {
         // Verificar se conteúdo existe e está ativo
         const content = await ContentModel.findById(contentId);
         if (!content) {
@@ -110,13 +110,23 @@ class ContentService {
             throw new Error('Conteúdo não está ativo');
         }
 
-        // Verificar se IP já visualizou recentemente (evitar spam)
-        const hasRecentView = await ContentViewModel.hasRecentView(contentId, ipAddress, 30);
-        if (hasRecentView) {
-            throw new Error('Visualização já registrada recentemente para este IP');
+        // Verificar se IP já visualizou recentemente (apenas se não forçar nova view)
+        if (!forceNew) {
+            const hasRecentView = await ContentViewModel.hasRecentView(contentId, ipAddress, 10); // Reduzido para 10 minutos
+            if (hasRecentView) {
+                // Se já viu recentemente, retornar info da view existente sem erro
+                return {
+                    id: 'existing_view',
+                    content_id: contentId,
+                    ip_address: ipAddress,
+                    created_at: new Date().toISOString(),
+                    message: 'Visualização já registrada recentemente',
+                    is_existing: true
+                };
+            }
         }
 
-        // Registrar visualização
+        // Registrar nova visualização
         const viewRecord = await ContentViewModel.create({
             content_id: contentId,
             user_id: viewData.user_id || null,
@@ -127,7 +137,10 @@ class ContentService {
             view_percentage: viewData.view_percentage || null
         });
 
-        return viewRecord;
+        return {
+            ...viewRecord,
+            is_existing: false
+        };
     }
 
     /**
@@ -171,6 +184,79 @@ class ContentService {
             viewStats,
             uniqueViewsCount: uniqueViews.length,
             totalViews: content.total_visualizations
+        };
+    }
+
+    /**
+     * Iniciar streaming de conteúdo (NOVO - fluxo simplificado)
+     */
+    static async startStreaming(contentId, viewData, ipAddress, userAgent, intent = 'watch') {
+        // Obter detalhes do conteúdo
+        const content = await this.getContentById(contentId);
+        
+        if (!content.ativo) {
+            throw new Error('Conteúdo não está ativo');
+        }
+
+        let streamInfo = null;
+        let viewRecord = null;
+
+        try {
+            // Tentar registrar visualização (não falhar se já existir)
+            const forceNew = intent === 'rewatch';
+            viewRecord = await this.recordView(contentId, viewData, ipAddress, userAgent, forceNew);
+        } catch (viewError) {
+            // Se falhar ao registrar view, continuar com streaming
+            console.warn('View registration failed, continuing with streaming:', viewError.message);
+        }
+
+        // Se for torrent, preparar stream
+        if (TorrentUtils.isMagnetLink(content.url_transmissao)) {
+            const torrentService = require('./torrent-service');
+            
+            try {
+                const streamData = await torrentService.startTorrentStream(content.url_transmissao);
+                streamInfo = {
+                    type: 'torrent',
+                    streamId: streamData.streamId,
+                    streamUrl: `/api/v1/stream/${streamData.streamId}/video`,
+                    statusUrl: `/api/v1/stream/content/${contentId}/status`,
+                    filename: streamData.filename,
+                    fileSize: streamData.fileSize,
+                    progress: streamData.progress || 0
+                };
+            } catch (torrentError) {
+                // Log erro mas não falhar
+                console.warn('Torrent stream start failed:', torrentError.message);
+                streamInfo = {
+                    type: 'torrent',
+                    status: 'failed',
+                    error: torrentError.message,
+                    retry: true
+                };
+            }
+        } else {
+            // Stream direto
+            streamInfo = {
+                type: 'direct',
+                url: content.url_transmissao,
+                ready: true
+            };
+        }
+
+        return {
+            content: {
+                id: content.id,
+                nome: content.nome,
+                categoria: content.categoria,
+                subcategoria: content.subcategoria,
+                poster: content.poster,
+                backdrop: content.backdrop,
+                isTorrent: TorrentUtils.isMagnetLink(content.url_transmissao)
+            },
+            view: viewRecord,
+            streaming: streamInfo,
+            ready: streamInfo.type === 'direct' || streamInfo.status !== 'failed'
         };
     }
 }

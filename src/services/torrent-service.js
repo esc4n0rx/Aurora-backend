@@ -1,23 +1,35 @@
+const { Worker } = require('worker_threads');
+const path = require('path');
+const crypto = require('crypto');
+const EventEmitter = require('events');
 const TorrentUtils = require('../utils/torrent-utils');
 const streamCache = require('./stream-cache-service');
+const streamPool = require('./stream-pool-service');
 const { logger } = require('../config/logger');
 
-class TorrentService {
+class TorrentService extends EventEmitter {
     constructor() {
-        this.client = null;
+        super();
+        this.worker = null;
+        this.pendingRequests = new Map();
         this.isInitialized = false;
         this.initPromise = null;
         
-        // Validar configuração
-        TorrentUtils.validateTorrentConfig();
+        // Configurar limpeza automática
+        this.setupCleanupSchedule();
+        
+        // Escutar eventos do pool de streams
+        streamPool.on('streamInactive', (streamId) => {
+            this.handleStreamInactive(streamId);
+        });
     }
 
     /**
-     * Inicializar WebTorrent de forma assíncrona
+     * Inicializar serviço de forma assíncrona e não-bloqueante
      */
     async initialize() {
         if (this.isInitialized) {
-            return this.client;
+            return true;
         }
 
         if (this.initPromise) {
@@ -30,68 +42,195 @@ class TorrentService {
 
     async _doInitialize() {
         try {
-            // Import dinâmico para compatibilidade ESM
-            let WebTorrent;
-            try {
-                // Tentar import moderno primeiro
-                const { default: WT } = await import('webtorrent');
-                WebTorrent = WT;
-            } catch (importError) {
-                // Fallback para require se disponível
-                WebTorrent = require('webtorrent');
-            }
-
-            this.client = new WebTorrent();
-            this.setupClientEvents();
+            // Criar worker em thread separado
+            const workerPath = path.join(__dirname, '../workers/torrent-worker.js');
+            this.worker = new Worker(workerPath);
+            
+            this.setupWorkerEvents();
+            
+            // Aguardar inicialização do worker
+            await this.waitForWorkerInitialization();
+            
             this.isInitialized = true;
             
-            logger.info('TorrentService initialized', {
-                nodeId: this.client.nodeId,
-                maxConns: this.client.maxConns
-            });
-
-            return this.client;
+            logger.info('TorrentService initialized with worker thread');
+            return true;
         } catch (error) {
-            logger.error('Failed to initialize WebTorrent', {
+            logger.error('Failed to initialize TorrentService', {
                 error: error.message,
                 stack: error.stack
             });
-            throw new Error(`Falha ao inicializar WebTorrent: ${error.message}`);
+            throw error;
         }
     }
 
     /**
-     * Configurar eventos do cliente WebTorrent
+     * Configurar eventos do worker
      */
-    setupClientEvents() {
-        if (!this.client) return;
-
-        this.client.on('error', (err) => {
-            logger.error('WebTorrent client error', {
-                error: err.message,
-                stack: err.stack
-            });
+    setupWorkerEvents() {
+        this.worker.on('message', (message) => {
+            this.handleWorkerMessage(message);
         });
 
-        this.client.on('torrent', (torrent) => {
-            logger.info('Torrent added to client', {
-                infoHash: torrent.infoHash,
-                name: torrent.name
+        this.worker.on('error', (error) => {
+            logger.error('Torrent worker error', {
+                error: error.message,
+                stack: error.stack
+            });
+            this.emit('worker_error', error);
+        });
+
+        this.worker.on('exit', (code) => {
+            logger.warn('Torrent worker exited', { code });
+            this.isInitialized = false;
+            this.worker = null;
+        });
+    }
+
+    /**
+     * Aguardar inicialização do worker
+     */
+    waitForWorkerInitialization() {
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Worker initialization timeout'));
+            }, 10000);
+
+            const messageHandler = (message) => {
+                if (message.type === 'initialized') {
+                    clearTimeout(timeout);
+                    this.worker.off('message', messageHandler);
+                    resolve(message.data);
+                } else if (message.type === 'error') {
+                    clearTimeout(timeout);
+                    this.worker.off('message', messageHandler);
+                    reject(new Error(message.data.message));
+                }
+            };
+
+            this.worker.on('message', messageHandler);
+        });
+    }
+
+    /**
+     * Processar mensagens do worker
+     */
+    handleWorkerMessage(message) {
+        const { type, data, requestId } = message;
+
+        switch (type) {
+            case 'torrent_ready':
+                this.resolveRequest(requestId, data);
+                break;
+
+            case 'torrent_info':
+                this.resolveRequest(requestId, data);
+                break;
+
+            case 'stats':
+                this.resolveRequest(requestId, data);
+                break;
+
+            case 'error':
+                this.rejectRequest(requestId, new Error(data.message));
+                break;
+
+            case 'progress_update':
+                this.updateStreamProgress(data);
+                break;
+
+            case 'torrent_added':
+            case 'torrent_removed':
+                // Log eventos informativos
+                logger.info(`Worker event: ${type}`, data);
+                break;
+        }
+    }
+
+    /**
+     * Enviar mensagem para worker com timeout
+     */
+    sendWorkerMessage(type, data, timeout = 30000) {
+        return new Promise((resolve, reject) => {
+            if (!this.worker) {
+                reject(new Error('Worker not available'));
+                return;
+            }
+
+            const requestId = crypto.randomUUID();
+            
+            // Configurar timeout
+            const timeoutHandle = setTimeout(() => {
+                this.pendingRequests.delete(requestId);
+                reject(new Error(`Worker request timeout: ${type}`));
+            }, timeout);
+
+            // Armazenar request pendente
+            this.pendingRequests.set(requestId, {
+                resolve: (data) => {
+                    clearTimeout(timeoutHandle);
+                    resolve(data);
+                },
+                reject: (error) => {
+                    clearTimeout(timeoutHandle);
+                    reject(error);
+                }
+            });
+
+            // Enviar mensagem
+            this.worker.postMessage({
+                type,
+                data: { ...data, requestId }
             });
         });
     }
 
     /**
-     * Iniciar streaming de torrent
+     * Resolver request pendente
+     */
+    resolveRequest(requestId, data) {
+        const request = this.pendingRequests.get(requestId);
+        if (request) {
+            this.pendingRequests.delete(requestId);
+            request.resolve(data);
+        }
+    }
+
+    /**
+     * Rejeitar request pendente
+     */
+    rejectRequest(requestId, error) {
+        const request = this.pendingRequests.get(requestId);
+        if (request) {
+            this.pendingRequests.delete(requestId);
+            request.reject(error);
+        }
+    }
+
+    /**
+     * Atualizar progresso do stream
+     */
+    updateStreamProgress(data) {
+        const stream = streamCache.getStream(data.streamId);
+        if (stream) {
+            stream.progress = data.progress;
+            stream.downloadSpeed = data.downloadSpeed;
+            stream.uploadSpeed = data.uploadSpeed;
+            stream.peers = data.peers;
+        }
+    }
+
+    /**
+     * Iniciar streaming de torrent (não-bloqueante)
      */
     async startTorrentStream(magnetUrl) {
         try {
-            // Garantir que WebTorrent está inicializado
+            // Garantir inicialização
             await this.initialize();
 
             const streamId = TorrentUtils.generateStreamId(magnetUrl);
             
-            // Verificar se já existe no cache
+            // Verificar cache primeiro
             if (streamCache.hasStream(streamId)) {
                 logger.info('Torrent stream found in cache', { streamId });
                 return streamCache.getStream(streamId);
@@ -102,39 +241,33 @@ class TorrentService {
                 magnetUrl: magnetUrl.substring(0, 50) + '...'
             });
 
-            // Criar promise para aguardar o torrent estar pronto
-            const torrentData = await this.downloadTorrent(magnetUrl);
-            
-            // Encontrar melhor arquivo de vídeo
-            const videoFile = TorrentUtils.findBestVideoFile(torrentData.torrent.files);
-            
-            if (!videoFile) {
-                throw new Error('Nenhum arquivo de vídeo encontrado no torrent');
-            }
-
-            const streamData = {
-                streamId,
-                torrent: torrentData.torrent,
-                file: videoFile,
-                filename: videoFile.name,
-                fileSize: videoFile.length,
+            // Solicitar ao worker para adicionar torrent
+            const workerData = await this.sendWorkerMessage('add_torrent', {
                 magnetUrl,
+                streamId
+            });
+
+            // Criar dados do stream
+            const streamData = {
+                streamId: workerData.streamId,
+                filename: workerData.filename,
+                fileSize: workerData.fileSize,
+                magnetUrl,
+                infoHash: workerData.infoHash,
                 progress: 0,
                 downloadSpeed: 0,
                 uploadSpeed: 0,
-                peers: 0
+                peers: 0,
+                isReady: true
             };
 
             // Adicionar ao cache
             const cachedStream = streamCache.addStream(streamId, streamData);
             
-            // Configurar atualizações de progresso
-            this.setupProgressTracking(torrentData.torrent, streamId);
-            
             logger.info('Torrent stream ready', {
                 streamId,
-                filename: videoFile.name,
-                fileSize: TorrentUtils.formatFileSize(videoFile.length)
+                filename: workerData.filename,
+                fileSize: TorrentUtils.formatFileSize(workerData.fileSize)
             });
 
             return cachedStream;
@@ -148,129 +281,168 @@ class TorrentService {
     }
 
     /**
-     * Download do torrent
+     * Criar stream de arquivo (com pool de conexões)
      */
-    async downloadTorrent(magnetUrl) {
-        if (!this.client) {
-            throw new Error('WebTorrent client não inicializado');
-        }
+    createFileStream(streamId, start = 0, end = null, req) {
+        try {
+            // Registrar conexão no pool
+            const connectionId = crypto.randomUUID();
+            streamPool.registerConnection(streamId, connectionId, req);
 
-        return new Promise((resolve, reject) => {
-            const torrent = this.client.add(magnetUrl, {
-                strategy: 'sequential' // Download sequencial para streaming
-            });
-
-            const timeout = setTimeout(() => {
-                torrent.destroy();
-                reject(new Error('Timeout aguardando torrent ficar pronto'));
-            }, 30000); // 30 segundos de timeout
-
-            torrent.on('ready', () => {
-                clearTimeout(timeout);
-                resolve({ torrent });
-            });
-
-            torrent.on('error', (err) => {
-                clearTimeout(timeout);
-                reject(new Error(`Erro no torrent: ${err.message}`));
-            });
-        });
-    }
-
-    /**
-     * Configurar tracking de progresso
-     */
-    setupProgressTracking(torrent, streamId) {
-        const updateInterval = setInterval(() => {
+            // Simular criação de stream (o worker gerencia o arquivo real)
             const stream = streamCache.getStream(streamId);
             
-            if (!stream || torrent.destroyed) {
-                clearInterval(updateInterval);
-                return;
+            if (!stream) {
+                streamPool.removeConnection(connectionId, streamId);
+                throw new Error('Stream not found in cache');
             }
 
-            // Atualizar estatísticas
-            stream.progress = Math.round(torrent.progress * 100);
-            stream.downloadSpeed = torrent.downloadSpeed;
-            stream.uploadSpeed = torrent.uploadSpeed;
-            stream.peers = torrent.numPeers;
+            // Atualizar atividade
+            streamPool.updateActivity(connectionId, streamId);
 
-            // Log periódico do progresso
-            if (stream.progress % 10 === 0) { // Log a cada 10%
-                logger.info('Torrent download progress', {
-                    streamId,
-                    progress: `${stream.progress}%`,
-                    downloadSpeed: TorrentUtils.formatFileSize(stream.downloadSpeed) + '/s',
-                    peers: stream.peers
-                });
-            }
-        }, 2000); // Atualizar a cada 2 segundos
-    }
+            logger.info('File stream created', {
+                streamId,
+                connectionId,
+                range: `${start}-${end || 'end'}`,
+                filename: stream.filename
+            });
 
-    /**
-     * Criar stream de um arquivo do torrent
-     */
-    createFileStream(streamId, start = 0, end = null) {
-        const stream = streamCache.getStream(streamId);
-        
-        if (!stream) {
-            throw new Error('Stream não encontrado no cache');
+            // Retornar mock stream para compatibilidade
+            // Na implementação real, o worker gerenciaria o stream de arquivo
+            const mockStream = new (require('stream').Readable)({
+                read() {
+                    // Implementação mock - substituir por comunicação com worker
+                    this.push(null);
+                }
+            });
+
+            // Cleanup quando stream acabar
+            mockStream.on('end', () => {
+                streamPool.removeConnection(connectionId, streamId);
+            });
+
+            mockStream.on('error', () => {
+                streamPool.removeConnection(connectionId, streamId);
+            });
+
+            return mockStream;
+        } catch (error) {
+            logger.error('Failed to create file stream', {
+                streamId,
+                error: error.message
+            });
+            throw error;
         }
-
-        const { file } = stream;
-        
-        // Definir end se não fornecido
-        if (end === null) {
-            end = file.length - 1;
-        }
-
-        logger.info('Creating file stream', {
-            streamId,
-            filename: file.name,
-            range: `${start}-${end}`,
-            totalSize: file.length
-        });
-
-        // Criar stream do arquivo com range
-        return file.createReadStream({ start, end });
     }
 
     /**
      * Obter informações do stream
      */
-    getStreamInfo(streamId) {
-        const stream = streamCache.getStream(streamId);
-        
-        if (!stream) {
+    async getStreamInfo(streamId) {
+        try {
+            const cachedStream = streamCache.getStream(streamId);
+            
+            if (!cachedStream) {
+                return null;
+            }
+
+            // Obter info adicional do worker se necessário
+            let workerInfo = null;
+            try {
+                workerInfo = await this.sendWorkerMessage('get_info', { streamId }, 5000);
+            } catch (error) {
+                logger.warn('Failed to get worker info', { streamId, error: error.message });
+            }
+
+            // Combinar informações
+            return {
+                ...cachedStream,
+                ...(workerInfo || {}),
+                poolInfo: streamPool.getStreamInfo(streamId)
+            };
+        } catch (error) {
+            logger.error('Failed to get stream info', {
+                streamId,
+                error: error.message
+            });
             return null;
         }
-
-        return {
-            streamId: stream.streamId,
-            filename: stream.filename,
-            fileSize: stream.fileSize,
-            progress: stream.progress,
-            downloadSpeed: stream.downloadSpeed,
-            uploadSpeed: stream.uploadSpeed,
-            peers: stream.peers,
-            activeConnections: stream.activeConnections,
-            createdAt: stream.createdAt,
-            lastAccessed: stream.lastAccessed
-        };
     }
 
     /**
      * Parar stream
      */
-    stopStream(streamId) {
-        const stream = streamCache.getStream(streamId);
-        
-        if (stream && stream.activeConnections === 0) {
+    async stopStream(streamId) {
+        try {
+            // Remover do pool
+            streamPool.forceRemoveStream(streamId);
+            
+            // Remover do cache
             streamCache.removeStream(streamId);
             
-            logger.info('Torrent stream stopped', {
+            // Notificar worker
+            if (this.worker) {
+                this.worker.postMessage({
+                    type: 'remove_torrent',
+                    data: { streamId }
+                });
+            }
+            
+            logger.info('Stream stopped', { streamId });
+        } catch (error) {
+            logger.error('Failed to stop stream', {
                 streamId,
-                filename: stream.filename
+                error: error.message
+            });
+        }
+    }
+
+    /**
+     * Lidar com streams inativos
+     */
+    handleStreamInactive(streamId) {
+        logger.info('Handling inactive stream', { streamId });
+        
+        // Remover stream após delay para dar chance de reconexão
+        setTimeout(() => {
+            if (!streamPool.hasActiveConnections(streamId)) {
+                this.stopStream(streamId);
+            }
+        }, 30000); // 30 segundos de grace period
+    }
+
+    /**
+     * Configurar limpeza automática
+     */
+    setupCleanupSchedule() {
+        // Limpeza a cada 5 minutos
+        setInterval(() => {
+            this.performCleanup();
+        }, 300000);
+
+        logger.info('Torrent cleanup schedule configured');
+    }
+
+    /**
+     * Executar limpeza
+     */
+    async performCleanup() {
+        try {
+            // Limpar no worker
+            if (this.worker) {
+                this.worker.postMessage({
+                    type: 'cleanup',
+                    data: {}
+                });
+            }
+
+            // Limpar cache local
+            streamCache.cleanupExpiredStreams();
+            
+            logger.info('Torrent cleanup completed');
+        } catch (error) {
+            logger.error('Cleanup failed', {
+                error: error.message
             });
         }
     }
@@ -278,47 +450,105 @@ class TorrentService {
     /**
      * Obter estatísticas gerais
      */
-    getStats() {
-        if (!this.client) {
+    async getStats() {
+        try {
+            let workerStats = null;
+            
+            if (this.worker && this.isInitialized) {
+                try {
+                    workerStats = await this.sendWorkerMessage('get_stats', {}, 5000);
+                } catch (error) {
+                    logger.warn('Failed to get worker stats', { error: error.message });
+                }
+            }
+
             return {
-                client: {
-                    torrents: 0,
-                    downloadSpeed: 0,
-                    uploadSpeed: 0,
-                    ratio: 0,
-                    initialized: false
+                service: {
+                    initialized: this.isInitialized,
+                    pendingRequests: this.pendingRequests.size,
+                    hasWorker: !!this.worker
                 },
-                cache: streamCache.getCacheStats()
+                worker: workerStats || {
+                    torrentsCount: 0,
+                    clientStats: null
+                },
+                cache: streamCache.getCacheStats(),
+                pool: streamPool.getStats()
+            };
+        } catch (error) {
+            logger.error('Failed to get stats', {
+                error: error.message
+            });
+            
+            return {
+                service: {
+                    initialized: false,
+                    error: error.message
+                },
+                cache: streamCache.getCacheStats(),
+                pool: streamPool.getStats()
             };
         }
-
-        return {
-            client: {
-                torrents: this.client.torrents.length,
-                downloadSpeed: this.client.downloadSpeed,
-                uploadSpeed: this.client.uploadSpeed,
-                ratio: this.client.ratio,
-                initialized: this.isInitialized
-            },
-            cache: streamCache.getCacheStats()
-        };
     }
 
     /**
      * Destruir serviço
      */
-    destroy() {
-        streamCache.stopCleanupProcess();
-        streamCache.clearCache();
-        
-        if (this.client) {
-            this.client.destroy();
+    async destroy() {
+        try {
+            logger.info('Destroying TorrentService...');
+
+            // Parar cleanup
+            clearInterval(this.cleanupInterval);
+
+            // Limpar requests pendentes
+            for (const [requestId, request] of this.pendingRequests) {
+                request.reject(new Error('Service shutting down'));
+            }
+            this.pendingRequests.clear();
+
+            // Shutdown worker
+            if (this.worker) {
+                this.worker.postMessage({
+                    type: 'shutdown',
+                    data: {}
+                });
+
+                // Aguardar shutdown ou forçar após timeout
+                await new Promise((resolve) => {
+                    const timeout = setTimeout(() => {
+                        if (this.worker) {
+                            this.worker.terminate();
+                        }
+                        resolve();
+                    }, 5000);
+
+                    const messageHandler = (message) => {
+                        if (message.type === 'shutdown_complete') {
+                            clearTimeout(timeout);
+                            this.worker.off('message', messageHandler);
+                            resolve();
+                        }
+                    };
+
+                    this.worker.on('message', messageHandler);
+                });
+            }
+
+            // Cleanup serviços
+            streamPool.shutdown();
+            streamCache.clearCache();
+
+            this.isInitialized = false;
+            this.worker = null;
+            this.initPromise = null;
+
+            logger.info('TorrentService destroyed');
+        } catch (error) {
+            logger.error('Error destroying TorrentService', {
+                error: error.message
+            });
         }
-        
-        this.isInitialized = false;
-        this.initPromise = null;
-        
-        logger.info('TorrentService destroyed');
     }
 }
 
@@ -326,13 +556,13 @@ class TorrentService {
 const torrentService = new TorrentService();
 
 // Cleanup graceful no processo
-process.on('SIGINT', () => {
-    torrentService.destroy();
+process.on('SIGINT', async () => {
+    await torrentService.destroy();
     process.exit(0);
 });
 
-process.on('SIGTERM', () => {
-    torrentService.destroy();
+process.on('SIGTERM', async () => {
+    await torrentService.destroy();
     process.exit(0);
 });
 

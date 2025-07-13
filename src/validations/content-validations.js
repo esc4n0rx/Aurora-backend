@@ -11,12 +11,17 @@ const createContentValidation = z.object({
         .url('URL de transmissão deve ser válida')
         .max(500, 'URL deve ter no máximo 500 caracteres')
         .refine(url => ContentUtils.isValidStreamingUrl(url), {
-            message: 'URL deve ser um protocolo de streaming válido (http, https, rtmp, rtmps)'
+            message: 'URL deve ser um protocolo de streaming válido (http, https, rtmp, rtmps) ou magnet link'
         }),
     
     poster: z.string()
         .url('URL do poster deve ser válida')
         .max(500, 'URL do poster deve ter no máximo 500 caracteres')
+        .optional(),
+    
+    backdrop: z.string()
+        .url('URL do backdrop deve ser válida')
+        .max(500, 'URL do backdrop deve ter no máximo 500 caracteres')
         .optional(),
     
     categoria: z.string()
@@ -78,13 +83,18 @@ const updateContentValidation = z.object({
         .url('URL de transmissão deve ser válida')
         .max(500, 'URL deve ter no máximo 500 caracteres')
         .refine(url => ContentUtils.isValidStreamingUrl(url), {
-            message: 'URL deve ser um protocolo de streaming válido'
+            message: 'URL deve ser um protocolo de streaming válido ou magnet link'
         })
         .optional(),
     
     poster: z.string()
         .url('URL do poster deve ser válida')
         .max(500, 'URL do poster deve ter no máximo 500 caracteres')
+        .optional(),
+    
+    backdrop: z.string()
+        .url('URL do backdrop deve ser válida')
+        .max(500, 'URL do backdrop deve ter no máximo 500 caracteres')
         .optional(),
     
     categoria: z.string()
@@ -131,39 +141,39 @@ const listContentValidation = z.object({
         .refine(val => !isNaN(val) && val >= 0 && val <= 10, 'Rating mínimo deve ser entre 0 e 10')
         .optional(),
     rating_max: z.string()
-        .transform(val => parseFloat(val))
-        .refine(val => !isNaN(val) && val >= 0 && val <= 10, 'Rating máximo deve ser entre 0 e 10')
-        .optional(),
-    temporada: z.string()
-        .transform(val => parseInt(val))
-        .refine(val => !isNaN(val) && val >= 1, 'Temporada deve ser um número maior que 0')
-        .optional(),
-    limit: z.string()
-        .transform(val => parseInt(val))
-        .refine(val => !isNaN(val) && val >= 1 && val <= 100, 'Limit deve ser entre 1 e 100')
-        .optional()
-        .default('20'),
-    offset: z.string()
-        .transform(val => parseInt(val))
-        .refine(val => !isNaN(val) && val >= 0, 'Offset deve ser maior ou igual a 0')
-        .optional()
-        .default('0'),
-    search: z.string().max(255).optional(),
-    sort_by: z.enum(['nome', 'rating', 'total_visualizations', 'created_at']).optional().default('created_at'),
-    sort_order: z.enum(['asc', 'desc']).optional().default('desc')
+    .transform(val => parseFloat(val))
+    .refine(val => !isNaN(val) && val >= 0 && val <= 10, 'Rating máximo deve ser entre 0 e 10')
+    .optional(),
+temporada: z.string()
+    .transform(val => parseInt(val))
+    .refine(val => !isNaN(val) && val >= 1, 'Temporada deve ser um número maior que 0')
+    .optional(),
+limit: z.string()
+    .transform(val => parseInt(val))
+    .refine(val => !isNaN(val) && val >= 1 && val <= 100, 'Limit deve ser entre 1 e 100')
+    .optional()
+    .default('20'),
+offset: z.string()
+    .transform(val => parseInt(val))
+    .refine(val => !isNaN(val) && val >= 0, 'Offset deve ser maior ou igual a 0')
+    .optional()
+    .default('0'),
+search: z.string().max(255).optional(),
+sort_by: z.enum(['nome', 'rating', 'total_visualizations', 'created_at']).optional().default('created_at'),
+sort_order: z.enum(['asc', 'desc']).optional().default('desc')
 });
 
 // Validação para registro de visualização
 const recordViewValidation = z.object({
-    user_id: z.string().uuid().optional(),
-    profile_id: z.string().uuid().optional(),
-    view_duration: z.number().int().min(0).optional(),
-    view_percentage: z.number().min(0).max(100).optional()
+user_id: z.string().uuid().optional(),
+profile_id: z.string().uuid().optional(),
+view_duration: z.number().int().min(0).optional(),
+view_percentage: z.number().min(0).max(100).optional()
 });
 
 module.exports = {
-    createContentValidation,
-    updateContentValidation,
-    listContentValidation,
-    recordViewValidation
+createContentValidation,
+updateContentValidation,
+listContentValidation,
+recordViewValidation
 };

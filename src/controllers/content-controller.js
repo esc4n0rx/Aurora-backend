@@ -249,119 +249,90 @@ class ContentController {
     }
 
     /**
-     * Registrar visualização de conteúdo
+     * Registrar visualização de conteúdo (CORRIGIDO)
      */
     static async recordView(req, res, next) {
         try {
             const { contentId } = req.params;
+            const { intent = 'watch' } = req.body; // Novo parâmetro
             const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
             const userAgent = req.get('User-Agent') || 'unknown';
             
-            // Primeiro, obter informações do conteúdo
-            const content = await ContentService.getContentById(contentId);
-            
-            // Se for torrent, inicializar stream automaticamente
-            let streamInfo = null;
-            if (TorrentUtils.isMagnetLink(content.url_transmissao)) {
-                try {
-                    // Tentar inicializar o stream do torrent
-                    const streamData = await torrentService.startTorrentStream(content.url_transmissao);
-                    streamInfo = {
-                        streamId: streamData.streamId,
-                        streamUrl: `/api/v1/stream/${streamData.streamId}/video`,
-                        filename: streamData.filename,
-                        fileSize: streamData.fileSize,
-                        progress: streamData.progress
-                    };
-                    
-                    // Log específico para início de torrent
-                    await LoggingService.logUserAction({
-                        userId: req.body.user_id || null,
-                        profileId: req.body.profile_id || null,
-                        actionType: ACTION_TYPES.TORRENT_DOWNLOAD,
-                        description: 'Torrent stream started from content view',
-                        metadata: {
-                            contentId,
-                            contentName: content.nome,
-                            streamId: streamData.streamId,
-                            filename: streamData.filename,
-                            magnetUrl: content.url_transmissao.substring(0, 50) + '...'
-                        },
-                        request: req,
-                        statusCode: 201
-                    });
-                } catch (torrentError) {
-                    // Log do erro do torrent, mas continue com o registro de visualização
-                    await LoggingService.logUserAction({
-                        userId: req.body.user_id || null,
-                        actionType: ACTION_TYPES.TORRENT_DOWNLOAD,
-                        description: 'Torrent stream start failed',
-                        metadata: {
-                            contentId,
-                            error: torrentError.message
-                        },
-                        request: req,
-                        statusCode: 400
-                    });
-                }
-            }
-            
-            // Registrar visualização normal
-            const view = await ContentService.recordView(
-                contentId,
-                req.body,
-                ipAddress,
-                userAgent
+            // Usar serviço simplificado
+            const result = await ContentService.startStreaming(
+                contentId, 
+                req.body, 
+                ipAddress, 
+                userAgent, 
+                intent
             );
             
-            // Log da visualização
+            // Log da ação
             await LoggingService.logUserAction({
                 userId: req.body.user_id || null,
                 profileId: req.body.profile_id || null,
                 actionType: ACTION_TYPES.CONTENT_VIEW,
-                description: 'Content view recorded',
+                description: `Content streaming started - ${intent}`,
                 metadata: {
                     contentId,
-                    contentName: content.nome,
-                    viewDuration: req.body.view_duration,
-                    viewPercentage: req.body.view_percentage,
-                    ipAddress,
-                    isTorrent: TorrentUtils.isMagnetLink(content.url_transmissao),
-                    streamInitialized: !!streamInfo
+                    contentName: result.content.nome,
+                    intent,
+                    streamType: result.streaming.type,
+                    viewRegistered: !!result.view && !result.view.is_existing,
+                    isRewatch: intent === 'rewatch'
                 },
                 request: req,
-                statusCode: 201
+                statusCode: 200
             });
             
-            // Resposta incluindo informações de stream se disponível
-            const responseData = {
-                view,
-                content: {
-                    id: content.id,
-                    nome: content.nome,
-                    categoria: content.categoria,
-                    subcategoria: content.subcategoria,
-                    isTorrent: TorrentUtils.isMagnetLink(content.url_transmissao)
+            // Resposta baseada no tipo de stream
+            if (result.streaming.type === 'direct') {
+                res.json({
+                    success: true,
+                    message: 'Streaming direto disponível',
+                    data: {
+                        type: 'direct',
+                        streamUrl: result.streaming.url,
+                        content: result.content,
+                        view: result.view
+                    }
+                });
+            } else if (result.streaming.type === 'torrent') {
+                if (result.streaming.status === 'failed') {
+                    res.status(202).json({
+                        success: false,
+                        message: 'Falha ao iniciar torrent, tente novamente',
+                        data: {
+                            type: 'torrent',
+                            status: 'failed',
+                            content: result.content,
+                            retry: true,
+                            retryUrl: `/api/v1/contents/${contentId}/view`
+                        }
+                    });
+                } else {
+                    res.status(202).json({
+                        success: true,
+                        message: 'Stream de torrent iniciado',
+                        data: {
+                            type: 'torrent',
+                            status: 'initializing',
+                            streamId: result.streaming.streamId,
+                            statusUrl: result.streaming.statusUrl,
+                            content: result.content,
+                            view: result.view,
+                            nextStep: 'poll_status'
+                        }
+                    });
                 }
-            };
-            
-            if (streamInfo) {
-                responseData.stream = streamInfo;
             }
             
-            res.status(201).json({
-                success: true,
-                message: streamInfo ? 
-                    'Visualização registrada e stream iniciado com sucesso' : 
-                    'Visualização registrada com sucesso',
-                data: responseData
-            });
         } catch (error) {
             // Log da falha
             await LoggingService.logUserAction({
                 userId: req.body.user_id || null,
                 actionType: ACTION_TYPES.CONTENT_VIEW,
-                description: 'Content view recording failed',
+                description: 'Content streaming failed',
                 metadata: {
                     contentId: req.params.contentId,
                     error: error.message
@@ -371,8 +342,7 @@ class ContentController {
             });
             
             if (error.message.includes('não encontrado') || 
-                error.message.includes('não está ativo') ||
-                error.message.includes('já registrada')) {
+                error.message.includes('não está ativo')) {
                 return res.status(400).json({
                     success: false,
                     message: error.message

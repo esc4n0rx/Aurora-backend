@@ -6,7 +6,9 @@ const {
     validateStreamRequest, 
     logStreamAccess, 
     streamRateLimit, 
-    streamSecurityHeaders 
+    streamSecurityHeaders,
+    streamConnectionManager,
+    streamHealthCheck
 } = require('../middlewares/stream-middleware');
 
 const router = express.Router();
@@ -20,7 +22,9 @@ router.use(logStreamAccess);
 // Stream direto de vídeo por streamId
 router.get('/:streamId/video', 
     streamRateLimit,
+    streamHealthCheck,
     validateStreamRequest,
+    streamConnectionManager,
     StreamController.streamVideo
 );
 
@@ -29,9 +33,14 @@ router.get('/:streamId/video',
 // Middleware de autenticação para rotas protegidas
 router.use(authenticateToken);
 
-// Iniciar stream de conteúdo
+// Iniciar stream de conteúdo (não-bloqueante)
 router.post('/content/:contentId/start', 
     StreamController.startStream
+);
+
+// Verificar status do stream
+router.get('/content/:contentId/status',
+    StreamController.getStreamStatus
 );
 
 // Stream direto de conteúdo (compatibilidade)
@@ -59,6 +68,11 @@ router.use(requireAdmin);
 // Obter estatísticas de streaming
 router.get('/admin/stats', 
     StreamController.getStreamStats
+);
+
+// Limpeza manual de streams
+router.post('/admin/cleanup',
+    StreamController.cleanupStreams
 );
 
 module.exports = router;
