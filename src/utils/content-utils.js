@@ -69,10 +69,144 @@ class ContentUtils {
     }
 
     /**
+     * NOVA: Verificar se conteúdo está pronto para streaming
+     */
+    static isReadyForStreaming(content) {
+        // Verificar se conteúdo existe
+        if (!content) {
+            return {
+                ready: false,
+                reason: 'Conteúdo não encontrado'
+            };
+        }
+
+        // Verificar se está ativo
+        if (!content.ativo) {
+            return {
+                ready: false,
+                reason: 'Conteúdo não está ativo'
+            };
+        }
+
+        // Verificar se tem URL de transmissão
+        if (!content.url_transmissao) {
+            return {
+                ready: false,
+                reason: 'URL de transmissão não disponível'
+            };
+        }
+
+        // Validar URL de transmissão
+        if (!this.isValidStreamingUrl(content.url_transmissao)) {
+            return {
+                ready: false,
+                reason: 'URL de transmissão inválida'
+            };
+        }
+
+        // Tudo ok
+        return {
+            ready: true,
+            reason: 'Conteúdo pronto para streaming'
+        };
+    }
+
+    /**
+     * NOVA: Verificar se URL requer proxy
+     */
+    static requiresProxy(url) {
+        if (!url || typeof url !== 'string') {
+            return false;
+        }
+
+        // Se for magnet link, não precisa de proxy
+        if (TorrentUtils.isMagnetLink(url)) {
+            return false;
+        }
+
+        try {
+            const parsedUrl = new URL(url);
+            
+            // URLs HTTP precisam de proxy em produção
+            if (parsedUrl.protocol === 'http:') {
+                return process.env.NODE_ENV === 'production';
+            }
+            
+            // URLs com auth tokens podem precisar de proxy
+            if (this.hasAuthParameters(url)) {
+                return true;
+            }
+            
+            // URLs de certas CDNs podem precisar de proxy
+            const requiresProxyCDNs = [
+                'akkamaized.net',
+                'cloudfront.net',
+                'fastly.com'
+            ];
+            
+            return requiresProxyCDNs.some(cdn => parsedUrl.hostname.includes(cdn));
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * NOVA: Detectar tipo de streaming
+     */
+    static detectStreamingType(url) {
+        if (!url || typeof url !== 'string') {
+            return 'unknown';
+        }
+
+        // Magnet links são torrents
+        if (TorrentUtils.isMagnetLink(url)) {
+            return 'torrent';
+        }
+
+        const urlLower = url.toLowerCase();
+
+        // HLS (Apple HTTP Live Streaming)
+        if (urlLower.includes('.m3u8') || urlLower.includes('hls')) {
+            return 'hls';
+        }
+
+        // DASH (Dynamic Adaptive Streaming over HTTP)
+        if (urlLower.includes('.mpd') || urlLower.includes('dash')) {
+            return 'dash';
+        }
+
+        // RTMP/RTMPS
+        if (urlLower.startsWith('rtmp://') || urlLower.startsWith('rtmps://')) {
+            return 'rtmp';
+        }
+
+        // Progressive download (MP4, MKV, etc.)
+        if (urlLower.includes('.mp4') || urlLower.includes('.mkv') || 
+            urlLower.includes('.avi') || urlLower.includes('.mov')) {
+            return 'progressive';
+        }
+
+        // Default para HTTP/HTTPS genérico
+        return 'http';
+    }
+
+    /**
+     * NOVA: Verificar se URL tem parâmetros de autenticação
+     */
+    static hasAuthParameters(url) {
+        const authParams = ['token', 'auth', 'key', 'session', 'jwt', 'bearer'];
+        const urlLower = url.toLowerCase();
+        
+        return authParams.some(param => urlLower.includes(param + '='));
+    }
+
+    /**
      * Formatar dados de conteúdo para resposta
      */
     static formatContentResponse(content) {
         const isSeries = this.isSeries(content.subcategoria);
+        const streamingType = this.detectStreamingType(content.url_transmissao);
+        const requiresProxy = this.requiresProxy(content.url_transmissao);
         
         const formatted = {
             ...content,
@@ -82,6 +216,7 @@ class ContentUtils {
             has_backdrop: !!content.backdrop,
             has_poster: !!content.poster,
             has_tmdb_data: !!content.tmdb_hit,
+            streaming_type: streamingType,
             
             // Informações específicas de série
             serie_info: isSeries ? {
@@ -115,19 +250,21 @@ class ContentUtils {
             }
         };
 
-        // Adicionar informações de streaming se for torrent
+        // Adicionar informações de streaming
         if (formatted.is_torrent) {
             formatted.stream_id = TorrentUtils.generateStreamId(content.url_transmissao);
             formatted.torrent_hash = TorrentUtils.extractHashFromMagnet(content.url_transmissao);
             formatted.streaming = {
                 type: 'torrent',
+                requires_proxy: false,
                 startUrl: `/api/v1/stream/content/${content.id}/start`,
                 statusUrl: `/api/v1/stream/content/${content.id}/status`,
                 playUrl: `/api/v1/stream/content/${content.id}/play`
             };
         } else {
             formatted.streaming = {
-                type: 'direct',
+                type: streamingType,
+                requires_proxy: requiresProxy,
                 url: content.url_transmissao
             };
         }
@@ -188,8 +325,6 @@ class ContentUtils {
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))
             .join(' ');
     }
-
-    // ... resto dos métodos existentes mantidos igual ...
 
     /**
      * Formatar resposta específica para episódio de série
