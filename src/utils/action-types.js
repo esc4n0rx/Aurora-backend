@@ -6,7 +6,8 @@ const ACTION_CATEGORIES = {
     AUTH: 'auth',
     PROFILE: 'profile',
     CONTENT: 'content',
-    STREAMING: 'streaming', // Nova categoria
+    STREAMING: 'streaming',
+    PROXY: 'proxy',
     SYSTEM: 'system',
     SECURITY: 'security',
     ADMIN: 'admin'
@@ -19,6 +20,13 @@ const ACTION_TYPES = {
     USER_LOGOUT: 'user_logout',
     EMAIL_CHECK: 'email_check',
     TOKEN_REFRESH: 'token_refresh',
+
+    // === CATEGORIAS (NOVO) ===
+    CATEGORIES_LIST: 'categories_list',
+    CATEGORIES_POPULAR: 'categories_popular',
+    CATEGORIES_SEARCH: 'categories_search',
+    CATEGORY_DETAILS: 'category_details',
+    CATEGORIES_STREAMING: 'categories_streaming',
     
     // === PERFIS ===
     PROFILE_CREATE: 'profile_create',
@@ -49,6 +57,14 @@ const ACTION_TYPES = {
     STREAM_INFO: 'stream_info',
     STREAM_STATS: 'stream_stats',
     TORRENT_DOWNLOAD: 'torrent_download',
+
+    // === PROXY (NOVOS) ===
+    PROXY_CREATE: 'proxy_create',
+    PROXY_ACCESS: 'proxy_access',
+    PROXY_INFO: 'proxy_info',
+    PROXY_STATS: 'proxy_stats',
+    PROXY_CACHE_CLEAR: 'proxy_cache_clear',
+    PROXY_URL_TEST: 'proxy_url_test',
     
     // === SISTEMA ===
     API_HEALTH_CHECK: 'api_health_check',
@@ -86,6 +102,13 @@ const getActionCategory = (actionType) => {
         [ACTION_TYPES.USER_LOGOUT]: ACTION_CATEGORIES.AUTH,
         [ACTION_TYPES.EMAIL_CHECK]: ACTION_CATEGORIES.AUTH,
         [ACTION_TYPES.TOKEN_REFRESH]: ACTION_CATEGORIES.AUTH,
+
+        // Categorias
+        [ACTION_TYPES.CATEGORIES_LIST]: ACTION_CATEGORIES.CONTENT,
+        [ACTION_TYPES.CATEGORIES_POPULAR]: ACTION_CATEGORIES.CONTENT,
+        [ACTION_TYPES.CATEGORIES_SEARCH]: ACTION_CATEGORIES.CONTENT,
+        [ACTION_TYPES.CATEGORY_DETAILS]: ACTION_CATEGORIES.CONTENT,
+        [ACTION_TYPES.CATEGORIES_STREAMING]: ACTION_CATEGORIES.CONTENT,
         
         // Perfis
         [ACTION_TYPES.PROFILE_CREATE]: ACTION_CATEGORIES.PROFILE,
@@ -116,6 +139,15 @@ const getActionCategory = (actionType) => {
         [ACTION_TYPES.STREAM_INFO]: ACTION_CATEGORIES.STREAMING,
         [ACTION_TYPES.STREAM_STATS]: ACTION_CATEGORIES.STREAMING,
         [ACTION_TYPES.TORRENT_DOWNLOAD]: ACTION_CATEGORIES.STREAMING,
+
+
+        // Proxy
+        [ACTION_TYPES.PROXY_CREATE]: ACTION_CATEGORIES.PROXY,
+        [ACTION_TYPES.PROXY_ACCESS]: ACTION_CATEGORIES.PROXY,
+        [ACTION_TYPES.PROXY_INFO]: ACTION_CATEGORIES.PROXY,
+        [ACTION_TYPES.PROXY_STATS]: ACTION_CATEGORIES.PROXY,
+        [ACTION_TYPES.PROXY_CACHE_CLEAR]: ACTION_CATEGORIES.PROXY,
+        [ACTION_TYPES.PROXY_URL_TEST]: ACTION_CATEGORIES.PROXY,
         
         // Sistema
         [ACTION_TYPES.API_HEALTH_CHECK]: ACTION_CATEGORIES.SYSTEM,

@@ -1,6 +1,13 @@
 const { z } = require('zod');
 const ContentUtils = require('../utils/content-utils');
 
+// Validação personalizada para categoria dinâmica
+const dynamicCategoryValidation = z.string()
+    .min(1, 'Categoria é obrigatória')
+    .max(100, 'Categoria deve ter no máximo 100 caracteres')
+    .regex(/^[A-ZÁÉÍÓÚÇ0-9\s+&-]+$/i, 'Categoria contém caracteres inválidos')
+    .transform(val => val.toUpperCase().trim()); // Normalizar para uppercase
+
 // Validação para criação de conteúdo
 const createContentValidation = z.object({
     nome: z.string()
@@ -24,10 +31,7 @@ const createContentValidation = z.object({
         .max(500, 'URL do backdrop deve ter no máximo 500 caracteres')
         .optional(),
     
-    categoria: z.string()
-        .refine(cat => ContentUtils.isValidCategory(cat), {
-            message: `Categoria deve ser uma das seguintes: ${ContentUtils.CATEGORIES.join(', ')}`
-        }),
+    categoria: dynamicCategoryValidation,
     
     subcategoria: z.string()
         .refine(subcat => ContentUtils.isValidSubcategory(subcat), {
@@ -153,9 +157,7 @@ const updateContentValidation = z.object({
         .max(500, 'URL do backdrop deve ter no máximo 500 caracteres')
         .optional(),
     
-    categoria: z.string()
-        .refine(cat => ContentUtils.isValidCategory(cat))
-        .optional(),
+    categoria: dynamicCategoryValidation.optional(),
     
     subcategoria: z.string()
         .refine(subcat => ContentUtils.isValidSubcategory(subcat))
@@ -231,47 +233,62 @@ const updateContentValidation = z.object({
     metadata: z.record(z.any()).optional()
 });
 
-// Validação para filtros de listagem (query parameters)
+// Validação para filtros de listagem (query parameters) - atualizada
 const listContentValidation = z.object({
-    categoria: z.string().optional(),
+    categoria: z.string()
+        .max(100, 'Categoria deve ter no máximo 100 caracteres')
+        .optional(),
+    
     subcategoria: z.string().optional(),
+    
     ativo: z.string()
         .transform(val => val === 'true')
         .optional(),
+    
     rating_min: z.string()
         .transform(val => parseFloat(val))
         .refine(val => !isNaN(val) && val >= 0 && val <= 10, 'Rating mínimo deve ser entre 0 e 10')
         .optional(),
+    
     rating_max: z.string()
         .transform(val => parseFloat(val))
         .refine(val => !isNaN(val) && val >= 0 && val <= 10, 'Rating máximo deve ser entre 0 e 10')
         .optional(),
+    
     temporada: z.string()
         .transform(val => parseInt(val))
         .refine(val => !isNaN(val) && val >= 1, 'Temporada deve ser um número maior que 0')
         .optional(),
+    
     status_serie: z.enum(['em_andamento', 'finalizada', 'cancelada', 'pausada'])
         .optional(),
+    
     tmdb_hit: z.string()
         .transform(val => val === 'true')
         .optional(),
+    
     serie_nome: z.string()
         .max(255, 'Nome da série deve ter no máximo 255 caracteres')
         .optional(),
+    
     limit: z.string()
         .transform(val => parseInt(val))
         .refine(val => !isNaN(val) && val >= 1 && val <= 100, 'Limit deve ser entre 1 e 100')
         .optional()
         .default('20'),
+    
     offset: z.string()
         .transform(val => parseInt(val))
         .refine(val => !isNaN(val) && val >= 0, 'Offset deve ser maior ou igual a 0')
         .optional()
         .default('0'),
+    
     search: z.string().max(255).optional(),
+    
     sort_by: z.enum(['nome', 'rating', 'total_visualizations', 'created_at', 'temporada', 'episodio'])
         .optional()
         .default('created_at'),
+    
     sort_order: z.enum(['asc', 'desc']).optional().default('desc')
 });
 
@@ -280,7 +297,8 @@ const recordViewValidation = z.object({
     user_id: z.string().uuid().optional(),
     profile_id: z.string().uuid().optional(),
     view_duration: z.number().int().min(0).optional(),
-    view_percentage: z.number().min(0).max(100).optional()
+    view_percentage: z.number().min(0).max(100).optional(),
+    intent: z.enum(['watch', 'rewatch']).optional().default('watch')
 });
 
 module.exports = {

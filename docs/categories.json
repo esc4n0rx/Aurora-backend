@@ -1,0 +1,471 @@
+{
+  "api_categories": {
+    "base_url": "http://localhost:3000/api/v1/categories",
+    "description": "API para gerenciamento e busca de categorias dinâmicas de conteúdo",
+    "routes": [
+      {
+        "method": "GET",
+        "endpoint": "/api/v1/categories",
+        "description": "Listar todas as categorias disponíveis com contagem",
+        "authentication": "Não requerida",
+        "query_parameters": {},
+        "request_example": {
+          "url": "GET /api/v1/categories",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "success": true,
+            "message": "Categorias obtidas com sucesso",
+            "data": {
+              "total_categories": 38,
+              "categories": [
+                {
+                  "categoria": "DIVERSOS",
+                  "total": 34703,
+                  "slug": "diversos",
+                  "display_name": "Diversos"
+                },
+                {
+                  "categoria": "NETFLIX",
+                  "total": 23233,
+                  "slug": "netflix",
+                  "display_name": "Netflix"
+                },
+                {
+                  "categoria": "AMAZON PRIME VIDEO",
+                  "total": 20736,
+                  "slug": "amazon-prime-video",
+                  "display_name": "Amazon Prime Video"
+                },
+                {
+                  "categoria": "GLOBOPLAY",
+                  "total": 12406,
+                  "slug": "globoplay",
+                  "display_name": "Globoplay"
+                },
+                {
+                  "categoria": "ANIMES",
+                  "total": 11905,
+                  "slug": "animes",
+                  "display_name": "Animes"
+                },
+                {
+                  "categoria": "DISNEY PLUS",
+                  "total": 10195,
+                  "slug": "disney-plus",
+                  "display_name": "Disney+"
+                },
+                {
+                  "categoria": "LANÇAMENTOS 2025",
+                  "total": 220,
+                  "slug": "lancamentos-2025",
+                  "display_name": "Lançamentos 2025"
+                }
+              ]
+            }
+          }
+        },
+        "response_error": {
+          "status_code": 500,
+          "body": {
+            "success": false,
+            "message": "Erro interno do servidor"
+          }
+        }
+      },
+      {
+        "method": "GET",
+        "endpoint": "/api/v1/categories/popular",
+        "description": "Obter categorias mais populares",
+        "authentication": "Não requerida",
+        "query_parameters": {
+          "limit": {
+            "type": "string",
+            "description": "Número máximo de categorias (1-100)",
+            "default": "20",
+            "example": "10"
+          }
+        },
+        "request_example": {
+          "url": "GET /api/v1/categories/popular?limit=5",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "success": true,
+            "message": "Categorias populares obtidas com sucesso",
+            "data": [
+              {
+                "categoria": "DIVERSOS",
+                "total": 34703,
+                "slug": "diversos",
+                "display_name": "Diversos"
+              },
+              {
+                "categoria": "NETFLIX",
+                "total": 23233,
+                "slug": "netflix",
+                "display_name": "Netflix"
+              },
+              {
+                "categoria": "AMAZON PRIME VIDEO",
+                "total": 20736,
+                "slug": "amazon-prime-video",
+                "display_name": "Amazon Prime Video"
+              },
+              {
+                "categoria": "GLOBOPLAY",
+                "total": 12406,
+                "slug": "globoplay",
+                "display_name": "Globoplay"
+              },
+              {
+                "categoria": "ANIMES",
+                "total": 11905,
+                "slug": "animes",
+                "display_name": "Animes"
+              }
+            ]
+          }
+        },
+        "response_error": {
+          "status_code": 400,
+          "body": {
+            "success": false,
+            "message": "Dados inválidos",
+            "errors": [
+              {
+                "field": "limit",
+                "message": "Limit deve ser um número entre 1 e 100"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "method": "GET",
+        "endpoint": "/api/v1/categories/search",
+        "description": "Buscar categorias por termo",
+        "authentication": "Não requerida",
+        "query_parameters": {
+          "q": {
+            "type": "string",
+            "description": "Termo de busca (mínimo 2 caracteres)",
+            "required": true,
+            "example": "netflix"
+          },
+          "limit": {
+            "type": "string",
+            "description": "Número máximo de resultados (1-50)",
+            "default": "10",
+            "example": "5"
+          }
+        },
+        "request_example": {
+          "url": "GET /api/v1/categories/search?q=disney&limit=3",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "success": true,
+            "message": "Busca de categorias realizada com sucesso",
+            "data": {
+              "search_term": "disney",
+              "results_count": 1,
+              "categories": [
+                {
+                  "categoria": "DISNEY PLUS",
+                  "total": 10195,
+                  "slug": "disney-plus",
+                  "display_name": "Disney+",
+                  "relevance": 80
+                }
+              ]
+            }
+          }
+        },
+        "response_error": {
+          "status_code": 400,
+          "body": {
+            "success": false,
+            "message": "Parâmetro de busca \"q\" é obrigatório"
+          }
+        }
+      },
+      {
+        "method": "GET",
+        "endpoint": "/api/v1/categories/streaming",
+        "description": "Obter categorias agrupadas por plataformas de streaming",
+        "authentication": "Não requerida",
+        "query_parameters": {},
+        "request_example": {
+          "url": "GET /api/v1/categories/streaming",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "success": true,
+            "message": "Categorias de streaming obtidas com sucesso",
+            "data": {
+              "streaming_platforms": [
+                {
+                  "categoria": "NETFLIX",
+                  "total": 23233,
+                  "slug": "netflix",
+                  "display_name": "Netflix"
+                },
+                {
+                  "categoria": "AMAZON PRIME VIDEO",
+                  "total": 20736,
+                  "slug": "amazon-prime-video",
+                  "display_name": "Amazon Prime Video"
+                },
+                {
+                  "categoria": "DISNEY PLUS",
+                  "total": 10195,
+                  "slug": "disney-plus",
+                  "display_name": "Disney+"
+                },
+                {
+                  "categoria": "HBO MAX",
+                  "total": 9107,
+                  "slug": "hbo-max",
+                  "display_name": "HBO Max"
+                },
+                {
+                  "categoria": "PARAMOUNT PLUS",
+                  "total": 6594,
+                  "slug": "paramount-plus",
+                  "display_name": "Paramount+"
+                },
+                {
+                  "categoria": "APPLE TV PLUS",
+                  "total": 2595,
+                  "slug": "apple-tv-plus",
+                  "display_name": "Apple TV+"
+                }
+              ],
+              "other_categories": [
+                {
+                  "categoria": "DIVERSOS",
+                  "total": 34703,
+                  "slug": "diversos",
+                  "display_name": "Diversos"
+                },
+                {
+                  "categoria": "ANIMES",
+                  "total": 11905,
+                  "slug": "animes",
+                  "display_name": "Animes"
+                },
+                {
+                  "categoria": "LEGENDADOS",
+                  "total": 6672,
+                  "slug": "legendados",
+                  "display_name": "Legendados"
+                },
+                {
+                  "categoria": "LANÇAMENTOS 2025",
+                  "total": 220,
+                  "slug": "lancamentos-2025",
+                  "display_name": "Lançamentos 2025"
+                }
+              ],
+              "total_streaming": 6,
+              "total_others": 32
+            }
+          }
+        }
+      },
+      {
+        "method": "GET",
+        "endpoint": "/api/v1/categories/:categoria",
+        "description": "Obter detalhes e estatísticas de uma categoria específica",
+        "authentication": "Não requerida",
+        "path_parameters": {
+          "categoria": {
+            "type": "string",
+            "description": "Nome da categoria (case sensitive)",
+            "example": "NETFLIX"
+          }
+        },
+        "request_example": {
+          "url": "GET /api/v1/categories/NETFLIX",
+          "headers": {
+            "Content-Type": "application/json"
+          }
+        },
+        "response_success": {
+          "status_code": 200,
+          "body": {
+            "success": true,
+            "message": "Detalhes da categoria obtidos com sucesso",
+            "data": {
+              "categoria": "NETFLIX",
+              "total_contents": 23233,
+              "total_views": 1250847,
+              "average_rating": 7.8,
+              "slug": "netflix",
+              "display_name": "Netflix",
+              "subcategorias": [
+                {
+                  "subcategoria": "serie",
+                  "count": 12456
+                },
+                {
+                  "subcategoria": "filme",
+                  "count": 8934
+                },
+                {
+                  "subcategoria": "documentario",
+                  "count": 1234
+                },
+                {
+                  "subcategoria": "anime",
+                  "count": 609
+                }
+              ],
+              "created_range": {
+                "oldest": "2023-01-15T10:30:00.000Z",
+                "newest": "2025-07-19T14:22:30.000Z"
+              }
+            }
+          }
+        },
+        "response_error": {
+          "status_code": 404,
+          "body": {
+            "success": false,
+            "message": "Categoria não encontrada"
+          }
+        }
+      }
+    ],
+    "integration_examples": {
+      "filter_content_by_category": {
+        "description": "Como usar categorias para filtrar conteúdo",
+        "request": {
+          "url": "GET /api/v1/contents?categoria=NETFLIX&limit=10",
+          "headers": {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer YOUR_JWT_TOKEN"
+          }
+        },
+        "response": {
+          "success": true,
+          "message": "Conteúdos obtidos com sucesso",
+          "data": [
+            {
+              "id": "550e8400-e29b-41d4-a716-446655440000",
+              "nome": "Stranger Things",
+              "categoria": "NETFLIX",
+              "subcategoria": "serie",
+              "category_info": {
+                "raw": "NETFLIX",
+                "slug": "netflix",
+                "display_name": "Netflix"
+              },
+              "is_series": true,
+              "temporada": 4,
+              "episodio": 8,
+              "rating": 9.2,
+              "total_visualizations": 15847
+            }
+          ],
+          "pagination": {
+            "total": 23233,
+            "limit": 10,
+            "offset": 0,
+            "hasMore": true
+          }
+        }
+      },
+      "search_multiple_categories": {
+        "description": "Como buscar em múltiplas categorias",
+        "method": "POST",
+        "url": "/api/v1/contents/search",
+        "payload": {
+          "categories": ["NETFLIX", "DISNEY PLUS", "HBO MAX"],
+          "subcategoria": "serie",
+          "limit": 20
+        }
+      }
+    },
+    "error_codes": {
+      "400": {
+        "description": "Dados inválidos na requisição",
+        "common_causes": [
+          "Parâmetro 'q' ausente na busca",
+          "Limit fora do range permitido",
+          "Caracteres inválidos no nome da categoria"
+        ]
+      },
+      "404": {
+        "description": "Categoria não encontrada",
+        "common_causes": [
+          "Nome da categoria não existe no banco",
+          "Categoria foi removida ou inativada"
+        ]
+      },
+      "500": {
+        "description": "Erro interno do servidor",
+        "common_causes": [
+          "Falha de conexão com banco de dados",
+          "Erro no processamento de dados"
+        ]
+      }
+    },
+    "tips_and_best_practices": {
+      "category_naming": {
+        "description": "Boas práticas para nomes de categoria",
+        "rules": [
+          "Categorias são case-sensitive (NETFLIX ≠ netflix)",
+          "Use sempre UPPERCASE para categorias de plataforma",
+          "Caracteres permitidos: A-Z, 0-9, espaços, +, &, -",
+          "Acentos são permitidos (LANÇAMENTOS, COMÉDIA)"
+        ]
+      },
+      "performance": {
+        "description": "Otimização de performance",
+        "recommendations": [
+          "Use cache para categorias populares (TTL: 1 hora)",
+          "Implemente paginação para listas grandes",
+          "Combine buscas de categoria com filtros de conteúdo",
+          "Use slugs para URLs amigáveis"
+        ]
+      },
+      "search_optimization": {
+        "description": "Otimização de busca",
+        "tips": [
+          "Busque por termos com pelo menos 2 caracteres",
+          "Use relevance score para ordenar resultados",
+          "Combine com autocomplete no frontend",
+          "Trate acentos e case na busca"
+        ]
+      }
+    },
+    "rate_limits": {
+      "public_endpoints": "100 requests/minute per IP",
+      "authenticated_endpoints": "1000 requests/minute per user",
+      "admin_endpoints": "No limit"
+    },
+    "caching_strategy": {
+      "categories_list": "Cache: 1 hora, Invalidação: manual ou automática",
+      "category_details": "Cache: 30 minutos, Invalidação: quando conteúdo é adicionado",
+      "search_results": "Cache: 15 minutos, Invalidação: automática"
+    }
+  }
+}

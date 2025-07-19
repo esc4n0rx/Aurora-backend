@@ -1,7 +1,7 @@
 const ContentModel = require('../models/content-model');
 const ContentViewModel = require('../models/content-view-model');
 const ContentUtils = require('../utils/content-utils');
-const TorrentUtils = require('../utils/torrent-utils');
+const ProxyService = require('./proxy-service');
 
 class ContentService {
     /**
@@ -34,11 +34,8 @@ class ContentService {
 
         // Validar URL de transmissão
         if (preparedData.url_transmissao) {
-            if (TorrentUtils.isMagnetLink(preparedData.url_transmissao)) {
-                const hash = TorrentUtils.extractHashFromMagnet(preparedData.url_transmissao);
-                if (!hash) {
-                    throw new Error('Magnet link inválido - hash não encontrado');
-                }
+            if (!ContentUtils.isValidStreamingUrl(preparedData.url_transmissao)) {
+                throw new Error('URL de streaming inválida');
             }
         }
 
@@ -114,11 +111,8 @@ class ContentService {
 
         // Validar URL de transmissão se fornecida
         if (preparedData.url_transmissao) {
-            if (TorrentUtils.isMagnetLink(preparedData.url_transmissao)) {
-                const hash = TorrentUtils.extractHashFromMagnet(preparedData.url_transmissao);
-                if (!hash) {
-                    throw new Error('Magnet link inválido - hash não encontrado');
-                }
+            if (!ContentUtils.isValidStreamingUrl(preparedData.url_transmissao)) {
+                throw new Error('URL de streaming inválida');
             }
         }
 
@@ -141,7 +135,7 @@ class ContentService {
     }
 
     /**
-     * Registrar visualização (mantendo lógica anterior)
+     * Registrar visualização
      */
     static async recordView(contentId, viewData, ipAddress, userAgent, forceNew = false) {
         // Verificar se conteúdo existe e está ativo
@@ -184,6 +178,124 @@ class ContentService {
             ...viewRecord,
             is_existing: false
         };
+    }
+
+    /**
+     * Iniciar streaming de conteúdo (NOVA LÓGICA - SEM TORRENT)
+     */
+    static async startStreaming(contentId, viewData, ipAddress, userAgent, intent = 'watch') {
+        // Obter detalhes do conteúdo
+        const content = await this.getContentById(contentId);
+        
+        // Verificar se está pronto para streaming
+        const readyCheck = ContentUtils.isReadyForStreaming(content);
+        if (!readyCheck.ready) {
+            throw new Error(readyCheck.reason);
+        }
+
+        let streamInfo = null;
+        let viewRecord = null;
+        let proxyInfo = null;
+
+        try {
+            // Tentar registrar visualização (não falhar se já existir)
+            const forceNew = intent === 'rewatch';
+            viewRecord = await this.recordView(contentId, viewData, ipAddress, userAgent, forceNew);
+        } catch (viewError) {
+            // Se falhar ao registrar view, continuar com streaming
+            console.warn('View registration failed, continuing with streaming:', viewError.message);
+        }
+
+        try {
+            // Verificar se precisa de proxy
+            if (ContentUtils.requiresProxy(content.url_transmissao)) {
+                // Criar proxy para URL HTTP
+                proxyInfo = await ProxyService.createContentProxy(contentId, content.url_transmissao);
+                
+                streamInfo = {
+                    type: 'proxy',
+                    streaming_type: ContentUtils.detectStreamingType(content.url_transmissao),
+                    proxyId: proxyInfo.proxyId,
+                    streamUrl: proxyInfo.proxyUrl,
+                    originalUrl: content.url_transmissao,
+                    requiresAuth: proxyInfo.requiresAuth,
+                    ready: true
+                };
+            } else {
+                // Stream direto - URL já é HTTPS ou ambiente não requer proxy
+                streamInfo = {
+                    type: 'direct',
+                    streaming_type: ContentUtils.detectStreamingType(content.url_transmissao),
+                    url: content.url_transmissao,
+                    ready: true
+                };
+            }
+        } catch (streamError) {
+            // Log erro mas não falhar completamente
+            console.warn('Stream setup failed:', streamError.message);
+            
+            // Tentar stream direto como fallback
+            streamInfo = {
+                type: 'direct',
+                streaming_type: ContentUtils.detectStreamingType(content.url_transmissao),
+                url: content.url_transmissao,
+                ready: true,
+                warning: 'Proxy creation failed, using direct stream'
+            };
+        }
+
+        return {
+            content: {
+                id: content.id,
+                nome: content.nome,
+                categoria: content.categoria,
+                subcategoria: content.subcategoria,
+                poster: content.poster,
+                backdrop: content.backdrop,
+                streaming_type: ContentUtils.detectStreamingType(content.url_transmissao),
+                episode_info: content.serie_info
+            },
+            view: viewRecord,
+            streaming: streamInfo,
+            proxy: proxyInfo,
+            ready: streamInfo.ready
+        };
+    }
+
+    /**
+     * Obter status de streaming de um conteúdo
+     */
+    static async getStreamingStatus(contentId) {
+        try {
+            const content = await this.getContentById(contentId);
+            
+            const readyCheck = ContentUtils.isReadyForStreaming(content);
+            if (!readyCheck.ready) {
+                return {
+                    status: 'error',
+                    ready: false,
+                    reason: readyCheck.reason
+                };
+            }
+
+            const streamingType = ContentUtils.detectStreamingType(content.url_transmissao);
+            const requiresProxy = ContentUtils.requiresProxy(content.url_transmissao);
+
+            return {
+                status: 'ready',
+                ready: true,
+                streaming_type: streamingType,
+                requires_proxy: requiresProxy,
+                content_type: content.streaming.type || 'progressive',
+                url_available: !!content.url_transmissao
+            };
+        } catch (error) {
+            return {
+                status: 'error',
+                ready: false,
+                reason: error.message
+            };
+        }
     }
 
     /**
@@ -232,7 +344,8 @@ class ContentService {
         return series.map(serie => ({
             ...serie,
             has_tmdb_data: !!serie.tmdb_hit,
-            formatted_status: this.formatSeriesStatus(serie.status_serie)
+            formatted_status: this.formatSeriesStatus(serie.status_serie),
+            streaming_type: ContentUtils.detectStreamingType(serie.url_transmissao || '')
         }));
     }
 
@@ -298,127 +411,109 @@ class ContentService {
         }
 
         const viewStats = await ContentViewModel.getViewStats(contentId, timeRange);
-        const uniqueViews = await ContentViewModel.getUniqueViews(contentId);
+       const uniqueViews = await ContentViewModel.getUniqueViews(contentId);
 
-        return {
-            content: ContentUtils.formatContentResponse(content),
-            viewStats,
-            uniqueViewsCount: uniqueViews.length,
-            totalViews: content.total_visualizations
-        };
-    }
+       return {
+           content: ContentUtils.formatContentResponse(content),
+           viewStats,
+           uniqueViewsCount: uniqueViews.length,
+           totalViews: content.total_visualizations
+       };
+   }
 
-    /**
-     * Buscar conteúdos por TMDB
-     */
-    static async getContentsByTmdb(tmdbSerieId, tmdbTemporadaId = null, tmdbEpisodioId = null) {
-        const contents = await ContentModel.findByTmdbId(tmdbSerieId, tmdbTemporadaId, tmdbEpisodioId);
-        return contents.map(content => ContentUtils.formatContentResponse(content));
-    }
+   /**
+    * Buscar conteúdos por TMDB
+    */
+   static async getContentsByTmdb(tmdbSerieId, tmdbTemporadaId = null, tmdbEpisodioId = null) {
+       const contents = await ContentModel.findByTmdbId(tmdbSerieId, tmdbTemporadaId, tmdbEpisodioId);
+       return contents.map(content => ContentUtils.formatContentResponse(content));
+   }
 
-    /**
-     * Iniciar streaming de conteúdo (mantendo lógica anterior)
-     */
-    static async startStreaming(contentId, viewData, ipAddress, userAgent, intent = 'watch') {
-        // Obter detalhes do conteúdo
-        const content = await this.getContentById(contentId);
-        
-        if (!content.ativo) {
-            throw new Error('Conteúdo não está ativo');
-        }
+   /**
+    * Formatar status de série
+    */
+   static formatSeriesStatus(status) {
+       const statusMap = {
+           'em_andamento': 'Em Andamento',
+           'finalizada': 'Finalizada',
+           'cancelada': 'Cancelada',
+           'pausada': 'Pausada'
+       };
+       
+       return statusMap[status] || status;
+   }
 
-        let streamInfo = null;
-        let viewRecord = null;
+   /**
+    * Obter conteúdos recentes
+    */
+   static async getRecentContents(limit = 10) {
+       const contents = await ContentModel.findRecent(limit);
+       return contents.map(content => ContentUtils.formatContentResponse(content));
+   }
 
-        try {
-            // Tentar registrar visualização (não falhar se já existir)
-            const forceNew = intent === 'rewatch';
-            viewRecord = await this.recordView(contentId, viewData, ipAddress, userAgent, forceNew);
-        } catch (viewError) {
-            // Se falhar ao registrar view, continuar com streaming
-            console.warn('View registration failed, continuing with streaming:', viewError.message);
-        }
+   /**
+    * Obter conteúdos por faixa de rating
+    */
+   static async getContentsByRating(minRating, maxRating, limit = 20) {
+       const contents = await ContentModel.findByRatingRange(minRating, maxRating, limit);
+       return contents.map(content => ContentUtils.formatContentResponse(content));
+   }
 
-        // Se for torrent, preparar stream
-        if (TorrentUtils.isMagnetLink(content.url_transmissao)) {
-            const torrentService = require('./torrent-service');
-            
-            try {
-                const streamData = await torrentService.startTorrentStream(content.url_transmissao);
-                streamInfo = {
-                    type: 'torrent',
-                    streamId: streamData.streamId,
-                    streamUrl: `/api/v1/stream/${streamData.streamId}/video`,
-                    statusUrl: `/api/v1/stream/content/${contentId}/status`,
-                    filename: streamData.filename,
-                    fileSize: streamData.fileSize,
-                    progress: streamData.progress || 0
-                };
-            } catch (torrentError) {
-                // Log erro mas não falhar
-                console.warn('Torrent stream start failed:', torrentError.message);
-                streamInfo = {
-                    type: 'torrent',
-                    status: 'failed',
-                    error: torrentError.message,
-                    retry: true
-                };
-            }
-        } else {
-            // Stream direto
-            streamInfo = {
-                type: 'direct',
-                url: content.url_transmissao,
-                ready: true
-            };
-        }
+   /**
+    * Testar conectividade de um conteúdo
+    */
+   static async testContentConnectivity(contentId) {
+       try {
+           const content = await this.getContentById(contentId);
+           
+           // Usar ProxyService para testar a URL
+           const axios = require('axios');
+           const startTime = Date.now();
+           
+           const response = await axios.head(content.url_transmissao, { 
+               timeout: 10000,
+               maxRedirects: 5
+           });
+           
+           const responseTime = Date.now() - startTime;
+           
+           return {
+               contentId,
+               url: content.url_transmissao,
+               status: 'success',
+               statusCode: response.status,
+               responseTime,
+               contentType: response.headers['content-type'],
+               contentLength: response.headers['content-length'],
+               streaming_type: ContentUtils.detectStreamingType(content.url_transmissao),
+               requires_proxy: ContentUtils.requiresProxy(content.url_transmissao)
+           };
+       } catch (error) {
+           return {
+               contentId,
+               status: 'error',
+               error: error.message,
+               code: error.code
+           };
+       }
+   }
 
-        return {
-            content: {
-                id: content.id,
-                nome: content.nome,
-                categoria: content.categoria,
-                subcategoria: content.subcategoria,
-                poster: content.poster,
-                backdrop: content.backdrop,
-                isTorrent: TorrentUtils.isMagnetLink(content.url_transmissao),
-                episode_info: content.serie_info
-            },
-            view: viewRecord,
-            streaming: streamInfo,
-            ready: streamInfo.type === 'direct' || streamInfo.status !== 'failed'
-        };
-    }
-
-    /**
-     * Formatar status de série
-     */
-    static formatSeriesStatus(status) {
-        const statusMap = {
-            'em_andamento': 'Em Andamento',
-            'finalizada': 'Finalizada',
-            'cancelada': 'Cancelada',
-            'pausada': 'Pausada'
-        };
-        
-        return statusMap[status] || status;
-    }
-
-    /**
-     * Obter conteúdos recentes
-     */
-    static async getRecentContents(limit = 10) {
-        const contents = await ContentModel.findRecent(limit);
-        return contents.map(content => ContentUtils.formatContentResponse(content));
-    }
-
-    /**
-     * Obter conteúdos por faixa de rating
-     */
-    static async getContentsByRating(minRating, maxRating, limit = 20) {
-        const contents = await ContentModel.findByRatingRange(minRating, maxRating, limit);
-        return contents.map(content => ContentUtils.formatContentResponse(content));
-    }
+   /**
+    * Obter recomendações baseadas em visualizações
+    */
+   static async getRecommendations(userId, limit = 10) {
+       // Implementação básica - pode ser expandida com algoritmos mais sofisticados
+       const recentContents = await this.getRecentContents(limit);
+       const popularContents = await this.getPopularContents(limit);
+       
+       // Misturar conteúdos recentes e populares
+       const mixed = [...recentContents, ...popularContents];
+       const unique = mixed.filter((content, index, self) => 
+           index === self.findIndex(c => c.id === content.id)
+       );
+       
+       return unique.slice(0, limit);
+   }
 }
 
 module.exports = ContentService;

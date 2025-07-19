@@ -2,16 +2,7 @@ const TorrentUtils = require('./torrent-utils');
 
 class ContentUtils {
     /**
-     * Categorias disponíveis
-     */
-    static CATEGORIES = [
-        'acao', 'aventura', 'comedia', 'drama', 'terror', 'ficcao_cientifica',
-        'fantasia', 'romance', 'thriller', 'documentario', 'animacao', 'crime',
-        'guerra', 'historia', 'musica', 'misterio', 'familia', 'biografia'
-    ];
-
-    /**
-     * Subcategorias disponíveis
+     * Subcategorias disponíveis (mantém fixas)
      */
     static SUBCATEGORIES = [
         'filme', 'serie', 'anime', 'desenho', 'documentario', 'curta',
@@ -31,13 +22,6 @@ class ContentUtils {
     static SERIE_STATUS = [
         'em_andamento', 'finalizada', 'cancelada', 'pausada'
     ];
-
-    /**
-     * Validar categoria
-     */
-    static isValidCategory(category) {
-        return this.CATEGORIES.includes(category);
-    }
 
     /**
      * Validar subcategoria
@@ -69,6 +53,19 @@ class ContentUtils {
      */
     static isValidSerieStatus(status) {
         return this.SERIE_STATUS.includes(status);
+    }
+
+    /**
+     * Validar categoria (agora dinâmico)
+     */
+    static async isValidCategory(category) {
+        // Validação básica de formato
+        if (!category || typeof category !== 'string') {
+            return false;
+        }
+
+        // Permitir qualquer string válida (será validada no banco)
+        return category.trim().length > 0 && category.length <= 100;
     }
 
     /**
@@ -108,7 +105,14 @@ class ContentUtils {
                 has_serie_data: !!content.tmdb_serie_id,
                 has_temporada_data: !!content.tmdb_temporada_id,
                 has_episodio_data: !!content.tmdb_episodio_id
-            } : null
+            } : null,
+            
+            // Informações de categoria formatadas
+            category_info: {
+                raw: content.categoria,
+                slug: this.generateCategorySlug(content.categoria),
+                display_name: this.formatCategoryDisplayName(content.categoria)
+            }
         };
 
         // Adicionar informações de streaming se for torrent
@@ -130,6 +134,62 @@ class ContentUtils {
 
         return formatted;
     }
+
+    /**
+     * Gerar slug para categoria
+     */
+    static generateCategorySlug(categoria) {
+        if (!categoria) return '';
+        
+        return categoria
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+            .replace(/[^a-z0-9\s-]/g, '') // Remove caracteres especiais
+            .replace(/\s+/g, '-') // Substitui espaços por hífens
+            .replace(/-+/g, '-') // Remove hífens duplos
+            .trim('-'); // Remove hífens das extremidades
+    }
+
+    /**
+     * Formatar nome de categoria para exibição
+     */
+    static formatCategoryDisplayName(categoria) {
+        if (!categoria) return '';
+        
+        // Casos especiais de formatação
+        const specialCases = {
+            'NETFLIX': 'Netflix',
+            'AMAZON PRIME VIDEO': 'Amazon Prime Video',
+            'DISNEY PLUS': 'Disney+',
+            'HBO MAX': 'HBO Max',
+            'APPLE TV PLUS': 'Apple TV+',
+            'PARAMOUNT PLUS': 'Paramount+',
+            'DISCOVERY PLUS': 'Discovery+',
+            'STAR PLUS': 'Star+',
+            'STARZ PLAY': 'Starz Play',
+            'DIRECTV': 'DirecTV',
+            'GLOBOPLAY': 'Globoplay',
+            'BRASIL PARALELO': 'Brasil Paralelo',
+            'MARVEL': 'Marvel',
+            'DC COMICS': 'DC Comics',
+            'LANÇAMENTOS 2025': 'Lançamentos 2025',
+            'LANÇAMENTOS 2024': 'Lançamentos 2024'
+        };
+
+        if (specialCases[categoria]) {
+            return specialCases[categoria];
+        }
+
+        // Formatação padrão: primeira letra maiúscula de cada palavra
+        return categoria
+            .toLowerCase()
+            .split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+            .join(' ');
+    }
+
+    // ... resto dos métodos existentes mantidos igual ...
 
     /**
      * Formatar resposta específica para episódio de série

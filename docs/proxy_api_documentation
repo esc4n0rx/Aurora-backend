@@ -1,0 +1,510 @@
+{
+  "proxy_api_documentation": {
+    "base_url": "http://localhost:3000/api/v1/proxy",
+    "authentication": "JWT Bearer Token (para rotas protegidas)",
+    "content_type": "application/json",
+    "routes": {
+      "public_routes": {
+        "stream_proxy": {
+          "method": "GET",
+          "path": "/stream/{proxyId}",
+          "description": "Fazer stream através do proxy",
+          "authentication": "Não requerida",
+          "headers": {
+            "Range": "bytes=0-1023 (opcional para requisições parciais)",
+            "User-Agent": "Nome do player/browser",
+            "Accept": "*/*"
+          },
+          "path_parameters": {
+            "proxyId": {
+              "type": "string",
+              "description": "ID único do proxy gerado na criação",
+              "example": "content123_a1b2c3d4e5f6"
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Stream de vídeo completo",
+              "headers": {
+                "Content-Type": "video/mp4",
+                "Accept-Ranges": "bytes",
+                "Content-Length": "15728640",
+                "Cache-Control": "public, max-age=1800",
+                "Access-Control-Allow-Origin": "*",
+                "X-Proxy-Server": "Aurora+ Proxy/1.0"
+              },
+              "body": "Binary video data stream"
+            },
+            "206": {
+              "description": "Stream parcial (range request)",
+              "headers": {
+                "Content-Type": "video/mp4",
+                "Content-Range": "bytes 0-1023/15728640",
+                "Content-Length": "1024",
+                "Accept-Ranges": "bytes"
+              },
+              "body": "Partial binary video data"
+            },
+            "404": {
+              "description": "Proxy não encontrado",
+              "body": {
+                "success": false,
+                "message": "Stream não encontrado ou expirado",
+                "suggestion": "Crie um novo proxy para este conteúdo"
+              }
+            },
+            "429": {
+              "description": "Rate limit excedido",
+              "body": {
+                "success": false,
+                "message": "Servidor temporariamente sobrecarregado",
+                "retryAfter": 300
+              }
+            }
+          },
+          "example_requests": [
+            {
+              "description": "Stream completo",
+              "curl": "curl -H 'User-Agent: VLC/3.0.0' http://localhost:3000/api/v1/proxy/stream/content123_a1b2c3d4e5f6"
+            },
+            {
+              "description": "Range request",
+              "curl": "curl -H 'Range: bytes=0-1023' http://localhost:3000/api/v1/proxy/stream/content123_a1b2c3d4e5f6"
+            }
+          ]
+        },
+        "stream_segment": {
+          "method": "GET",
+          "path": "/segment/{encodedUrl}",
+          "description": "Stream de segmento codificado (usado por playlists M3U8)",
+          "authentication": "Não requerida",
+          "path_parameters": {
+            "encodedUrl": {
+              "type": "string",
+              "description": "URL original codificada em base64url",
+              "example": "aHR0cDovL2V4YW1wbGUuY29tL3NlZ21lbnQwMDEudHM"
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Segmento de vídeo TS",
+              "headers": {
+                "Content-Type": "video/mp2t",
+                "Cache-Control": "public, max-age=3600",
+                "Accept-Ranges": "bytes"
+              },
+              "body": "Binary TS segment data"
+            },
+            "400": {
+              "description": "URL codificada inválida",
+              "body": {
+                "success": false,
+                "message": "URL de segmento inválida"
+              }
+            }
+          }
+        }
+      },
+      "authenticated_routes": {
+        "create_proxy": {
+          "method": "POST",
+          "path": "/content/{contentId}",
+          "description": "Criar proxy para um conteúdo específico",
+          "authentication": "JWT Bearer Token",
+          "path_parameters": {
+            "contentId": {
+              "type": "uuid",
+              "description": "ID do conteúdo no sistema",
+              "example": "550e8400-e29b-41d4-a716-446655440000"
+            }
+          },
+          "request_body": {
+            "quality": {
+              "type": "string",
+              "enum": ["240p", "360p", "480p", "720p", "1080p", "1440p", "4k", "auto"],
+              "default": "auto",
+              "description": "Qualidade preferida do stream"
+            },
+            "maxBitrate": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 50000,
+              "description": "Bitrate máximo em kbps (opcional)"
+            },
+            "forceReload": {
+              "type": "boolean",
+              "default": false,
+              "description": "Forçar recarregamento do cache"
+            },
+            "clientType": {
+              "type": "string",
+              "enum": ["browser", "mobile", "desktop_player", "smart_tv"],
+              "default": "browser",
+              "description": "Tipo de cliente para otimizações"
+            }
+          },
+          "example_request": {
+            "curl": "curl -X POST http://localhost:3000/api/v1/proxy/content/550e8400-e29b-41d4-a716-446655440000 -H 'Authorization: Bearer eyJhbGc...' -H 'Content-Type: application/json' -d '{\"quality\": \"1080p\", \"clientType\": \"browser\"}'",
+            "body": {
+              "quality": "1080p",
+              "clientType": "browser",
+              "forceReload": false
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Proxy criado com sucesso",
+              "body": {
+                "success": true,
+                "message": "Proxy criado com sucesso",
+                "data": {
+                  "proxyId": "content123_a1b2c3d4e5f6",
+                  "proxyUrl": "http://localhost:3000/api/v1/proxy/stream/content123_a1b2c3d4e5f6",
+                  "originalUrl": "http://srvdigital.fun:80/series/71277784/46664995/4128550.mp4",
+                  "contentType": "video/mp4",
+                  "requiresAuth": false,
+                  "content": {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "nome": "Exemplo de Série - S01E01",
+                    "categoria": "serie",
+                    "poster": "https://example.com/poster.jpg"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Conteúdo não ativo ou URL inválida",
+              "body": {
+                "success": false,
+                "message": "Conteúdo não está ativo"
+              }
+            },
+            "404": {
+              "description": "Conteúdo não encontrado",
+              "body": {
+                "success": false,
+                "message": "Conteúdo não encontrado"
+              }
+            }
+          }
+        },
+        "get_proxy_info": {
+          "method": "GET",
+          "path": "/info/{proxyId}",
+          "description": "Obter informações detalhadas do proxy",
+          "authentication": "JWT Bearer Token",
+          "path_parameters": {
+            "proxyId": {
+              "type": "string",
+              "description": "ID do proxy",
+              "example": "content123_a1b2c3d4e5f6"
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Informações do proxy",
+              "body": {
+                "success": true,
+                "message": "Informações do proxy obtidas com sucesso",
+                "data": {
+                  "proxyId": "content123_a1b2c3d4e5f6",
+                  "contentId": "550e8400-e29b-41d4-a716-446655440000",
+                  "contentType": "video/mp4",
+                  "requiresAuth": false,
+                  "createdAt": "2025-01-20T14:30:00.000Z",
+                  "streamUrl": "/api/v1/proxy/stream/content123_a1b2c3d4e5f6"
+                }
+              }
+            },
+            "404": {
+              "description": "Proxy não encontrado",
+              "body": {
+                "success": false,
+                "message": "Proxy não encontrado"
+              }
+            }
+          }
+        }
+      },
+      "admin_routes": {
+        "get_proxy_stats": {
+          "method": "GET",
+          "path": "/admin/stats",
+          "description": "Obter estatísticas detalhadas do sistema de proxy",
+          "authentication": "JWT Bearer Token (Admin)",
+          "responses": {
+            "200": {
+              "description": "Estatísticas do proxy",
+              "body": {
+                "success": true,
+                "message": "Estatísticas do proxy obtidas com sucesso",
+                "data": {
+                  "activeConnections": 15,
+                  "maxConnections": 100,
+                  "cache": {
+                    "urls": {
+                      "keys": 25,
+                      "hits": 1250,
+                      "misses": 85
+                    },
+                    "playlists": {
+                      "keys": 8,
+                      "hits": 450,
+                      "misses": 12
+                    },
+                    "segments": {
+                      "keys": 156,
+                      "hits": 2300,
+                      "misses": 45,
+                      "totalSize": 134217728
+                    }
+                  },
+                  "uptime": 86400,
+                  "memory": {
+                    "rss": 52428800,
+                    "heapTotal": 41943040,
+                    "heapUsed": 29360128,
+                    "external": 1048576
+                  }
+                }
+              }
+            }
+          }
+        },
+        "clear_proxy_cache": {
+          "method": "DELETE",
+          "path": "/admin/cache",
+          "description": "Limpar cache do proxy",
+          "authentication": "JWT Bearer Token (Admin)",
+          "request_body": {
+            "contentId": {
+              "type": "uuid",
+              "description": "ID específico do conteúdo (opcional - se não fornecido, limpa todo o cache)",
+              "example": "550e8400-e29b-41d4-a716-446655440000"
+            },
+            "cacheType": {
+              "type": "string",
+              "enum": ["all", "playlists", "segments", "urls"],
+              "default": "all",
+              "description": "Tipo específico de cache para limpar"
+            },
+            "olderThan": {
+              "type": "integer",
+              "description": "Limpar apenas itens mais antigos que X minutos",
+              "minimum": 1,
+              "maximum": 10080
+            }
+          },
+          "example_requests": [
+            {
+              "description": "Limpar cache de um conteúdo específico",
+              "body": {
+                "contentId": "550e8400-e29b-41d4-a716-446655440000"
+              }
+            },
+            {
+              "description": "Limpar todo o cache",
+              "body": {}
+            },
+            {
+              "description": "Limpar apenas segmentos antigos",
+              "body": {
+                "cacheType": "segments",
+                "olderThan": 60
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Cache limpo com sucesso",
+              "body": {
+                "success": true,
+                "message": "Cache do conteúdo 550e8400-e29b-41d4-a716-446655440000 limpo com sucesso"
+              }
+            }
+          }
+        },
+        "test_streaming_url": {
+          "method": "POST",
+          "path": "/admin/test-url",
+          "description": "Testar conectividade e validade de uma URL de streaming",
+          "authentication": "JWT Bearer Token (Admin)",
+          "request_body": {
+            "url": {
+              "type": "string",
+              "description": "URL para testar",
+              "example": "http://srvdigital.fun:80/series/71277784/46664995/playlist.m3u8"
+            },
+            "timeout": {
+              "type": "integer",
+              "default": 10000,
+              "minimum": 1000,
+              "maximum": 30000,
+              "description": "Timeout da requisição em milissegundos"
+            },
+            "followRedirects": {
+              "type": "boolean",
+              "default": true,
+              "description": "Seguir redirecionamentos"
+            },
+            "checkContent": {
+              "type": "boolean",
+              "default": false,
+              "description": "Verificar conteúdo da resposta (para M3U8)"
+            }
+          },
+          "example_request": {
+            "curl": "curl -X POST http://localhost:3000/api/v1/proxy/admin/test-url -H 'Authorization: Bearer eyJhbGc...' -H 'Content-Type: application/json' -d '{\"url\": \"http://example.com/playlist.m3u8\", \"checkContent\": true}'",
+            "body": {
+              "url": "http://srvdigital.fun:80/series/71277784/46664995/playlist.m3u8",
+              "timeout": 15000,
+              "checkContent": true
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Teste bem-sucedido",
+              "body": {
+                "success": true,
+                "message": "URL testada com sucesso",
+                "data": {
+                  "url": "http://srvdigital.fun:80/series/71277784/46664995/playlist.m3u8",
+                  "status": "success",
+                  "statusCode": 200,
+                  "contentType": "application/vnd.apple.mpegurl",
+                  "contentLength": "2048",
+                  "isPlaylist": true,
+                  "requiresAuth": false,
+                  "responseTime": 245,
+                  "redirects": 0,
+                  "finalUrl": "http://srvdigital.fun:80/series/71277784/46664995/playlist.m3u8"
+                }
+              }
+            },
+            "200_with_error": {
+              "description": "Teste com falha na conectividade",
+              "body": {
+                "success": false,
+                "message": "Falha ao testar URL",
+                "data": {
+                  "url": "http://invalid-url.com/playlist.m3u8",
+                  "status": "error",
+                  "error": "ENOTFOUND",
+                  "code": "ENOTFOUND",
+                  "responseTime": 10000
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "playlist_modification": {
+      "description": "Quando uma playlist M3U8 é solicitada através do proxy, as URLs internas são automaticamente modificadas",
+      "example": {
+        "original_playlist": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nsegment001.ts\n#EXTINF:10.0,\nsegment002.ts\n#EXT-X-ENDLIST",
+        "modified_playlist": "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:10\n#EXTINF:10.0,\nhttp://localhost:3000/api/v1/proxy/segment/aHR0cDovL2V4YW1wbGUuY29tL3NlZ21lbnQwMDEudHM\n#EXTINF:10.0,\nhttp://localhost:3000/api/v1/proxy/segment/aHR0cDovL2V4YW1wbGUuY29tL3NlZ21lbnQwMDIudHM\n#EXT-X-ENDLIST"
+      }
+    },
+    "error_responses": {
+      "400": {
+        "description": "Requisição inválida",
+        "examples": {
+          "invalid_proxy_id": {
+            "success": false,
+            "message": "ID do proxy inválido"
+          },
+          "invalid_url": {
+            "success": false,
+            "message": "URL de streaming inválida"
+          }
+        }
+      },
+      "401": {
+        "description": "Não autenticado",
+        "body": {
+          "success": false,
+          "message": "Token de acesso não fornecido"
+        }
+      },
+      "403": {
+        "description": "Não autorizado (admin apenas)",
+        "body": {
+          "success": false,
+          "message": "Acesso negado. Apenas administradores podem acessar este recurso."
+        }
+      },
+      "404": {
+        "description": "Recurso não encontrado",
+        "examples": {
+          "proxy_not_found": {
+            "success": false,
+            "message": "Proxy não encontrado ou expirado",
+            "suggestion": "Crie um novo proxy para este conteúdo"
+          },
+          "content_not_found": {
+            "success": false,
+            "message": "Conteúdo não encontrado"
+          }
+        }
+      },
+      "408": {
+        "description": "Timeout",
+        "body": {
+          "success": false,
+          "message": "Timeout no streaming"
+        }
+      },
+      "429": {
+        "description": "Rate limit excedido",
+        "examples": {
+          "proxy_overload": {
+            "success": false,
+            "message": "Servidor temporariamente sobrecarregado",
+            "retryAfter": 300
+          },
+          "rate_limit": {
+            "success": false,
+            "message": "Muitas requisições de streaming",
+            "retryAfter": 60
+          }
+        }
+      },
+      "500": {
+        "description": "Erro interno do servidor",
+        "body": {
+          "success": false,
+          "message": "Erro no streaming",
+          "suggestion": "Tente novamente em alguns instantes"
+        }
+      }
+    },
+    "integration_examples": {
+      "javascript_fetch": {
+        "create_proxy": "const response = await fetch('/api/v1/proxy/content/550e8400-e29b-41d4-a716-446655440000', {\n  method: 'POST',\n  headers: {\n    'Authorization': 'Bearer ' + token,\n    'Content-Type': 'application/json'\n  },\n  body: JSON.stringify({\n    quality: '1080p',\n    clientType: 'browser'\n  })\n});\nconst data = await response.json();",
+        "use_proxy_url": "const video = document.querySelector('video');\nvideo.src = data.data.proxyUrl;"
+      },
+      "hls_js_integration": "import Hls from 'hls.js';\n\n// Criar proxy primeiro\nconst proxyResponse = await createProxy(contentId);\nconst proxyUrl = proxyResponse.data.proxyUrl;\n\n// Usar com HLS.js\nif (Hls.isSupported()) {\n  const hls = new Hls();\n  hls.loadSource(proxyUrl);\n  hls.attachMedia(video);\n} else if (video.canPlayType('application/vnd.apple.mpegurl')) {\n  video.src = proxyUrl;\n}",
+      "curl_examples": {
+        "complete_workflow": [
+          "# 1. Fazer login",
+          "curl -X POST http://localhost:3000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\": \"user@example.com\", \"senha\": \"password\"}'",
+          "",
+          "# 2. Criar proxy (usar token do login)",
+          "curl -X POST http://localhost:3000/api/v1/proxy/content/550e8400-e29b-41d4-a716-446655440000 -H 'Authorization: Bearer YOUR_TOKEN' -H 'Content-Type: application/json' -d '{\"quality\": \"1080p\"}'",
+          "",
+          "# 3. Usar URL do proxy para streaming",
+          "curl -H 'User-Agent: VLC/3.0.0' http://localhost:3000/api/v1/proxy/stream/content123_a1b2c3d4e5f6"
+        ]
+      }
+    },
+    "best_practices": {
+      "caching": "O sistema implementa cache automático. URLs de playlist (.m3u8) são cacheadas por 5 minutos, segmentos por 1 hora.",
+      "rate_limiting": "Limite padrão de 60 requisições por minuto por IP. Configurável via PROXY_RATE_LIMIT.",
+      "security": "Sempre use HTTPS em produção. URLs originais são protegidas e não expostas ao cliente.",
+      "performance": "Para melhor performance, configure CDN na frente do proxy e ajuste os TTLs de cache conforme necessário.",
+      "monitoring": "Todas as requisições são logadas. Use as rotas de estatísticas para monitoramento.",
+      "error_handling": "Implemente retry logic no cliente para tratar timeouts e erros temporários."
+    }
+  }
+}

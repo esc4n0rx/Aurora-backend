@@ -14,7 +14,8 @@ const { logHealthCheck, logDocsAccess } = require('./middlewares/logging-middlew
 const authRoutes = require('./routes/auth-routes');
 const profileRoutes = require('./routes/profile-routes');
 const contentRoutes = require('./routes/content-routes');
-const streamRoutes = require('./routes/stream-routes'); // Nova rota
+const categoryRoutes = require('./routes/category-routes'); // Nova rota
+const streamRoutes = require('./routes/stream-routes');
 const adminRoutes = require('./routes/admin-routes');
 const healthRoutes = require('./routes/health-routes');
 
@@ -136,6 +137,13 @@ app.get('/', logDocsAccess, (req, res) => {
                 stats: 'GET /api/v1/contents/admin/stats (Admin only)',
                 viewStats: 'GET /api/v1/contents/:contentId/stats (Admin only)'
             },
+            categories: {
+                list: 'GET /api/v1/categories',
+                popular: 'GET /api/v1/categories/popular',
+                search: 'GET /api/v1/categories/search?q=term',
+                streaming: 'GET /api/v1/categories/streaming',
+                details: 'GET /api/v1/categories/:categoria'
+            },
             streaming: {
                 startStream: 'POST /api/v1/stream/content/:contentId/start',
                 streamVideo: 'GET /api/v1/stream/:streamId/video',
@@ -169,7 +177,8 @@ app.get('/', logDocsAccess, (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/profiles', profileRoutes);
 app.use('/api/v1/contents', contentRoutes);
-app.use('/api/v1/stream', streamRoutes); // Nova rota de streaming
+app.use('/api/v1/categories', categoryRoutes); // Nova rota de categorias
+app.use('/api/v1/stream', streamRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/health', healthRoutes);
 

@@ -1,0 +1,1277 @@
+{
+    "content_api_documentation": {
+      "base_url": "http://localhost:3000/api/v1/contents",
+      "authentication": "JWT Bearer Token (para rotas protegidas)",
+      "content_type": "application/json",
+      "routes": {
+        "public_routes": {
+          "get_popular_contents": {
+            "method": "GET",
+            "path": "/popular",
+            "description": "Obter conteúdos mais populares",
+            "authentication": "Não requerida",
+            "query_parameters": {
+              "limit": {
+                "type": "integer",
+                "default": 10,
+                "min": 1,
+                "max": 50,
+                "description": "Número máximo de conteúdos retornados"
+              }
+            },
+            "example_request": {
+              "curl": "curl http://localhost:3000/api/v1/contents/popular?limit=20"
+            },
+            "responses": {
+              "200": {
+                "description": "Lista de conteúdos populares",
+                "body": {
+                  "success": true,
+                  "message": "Conteúdos populares obtidos com sucesso",
+                  "data": [
+                    {
+                      "id": "550e8400-e29b-41d4-a716-446655440000",
+                      "nome": "Breaking Bad",
+                      "categoria": "drama",
+                      "subcategoria": "serie",
+                      "poster": "https://example.com/poster.jpg",
+                      "backdrop": "https://example.com/backdrop.jpg",
+                      "rating": 9.5,
+                      "view_count": 15420,
+                      "is_series": true,
+                      "streaming_type": "hls",
+                      "requires_proxy": true,
+                      "has_tmdb_data": true,
+                      "serie_info": {
+                        "nome_serie": "Breaking Bad",
+                        "status_serie": "finalizada",
+                        "temporadas_total": 5,
+                        "episodios_total": 62
+                      },
+                      "streaming": {
+                        "type": "hls",
+                        "original_url": "http://example.com/playlist.m3u8",
+                        "requires_proxy": true,
+                        "proxy_endpoints": {
+                          "create": "/api/v1/proxy/content/550e8400-e29b-41d4-a716-446655440000"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "get_series_episodes": {
+            "method": "GET",
+            "path": "/series/{seriesName}/episodes",
+            "description": "Obter episódios de uma série específica",
+            "authentication": "Não requerida",
+            "path_parameters": {
+              "seriesName": {
+                "type": "string",
+                "description": "Nome da série",
+                "example": "Breaking Bad"
+              }
+            },
+            "query_parameters": {
+              "season": {
+                "type": "integer",
+                "description": "Temporada específica (opcional)",
+                "example": 1
+              }
+            },
+            "example_request": {
+              "curl": "curl 'http://localhost:3000/api/v1/contents/series/Breaking%20Bad/episodes?season=1'"
+            },
+            "responses": {
+              "200": {
+                "description": "Episódios da série",
+                "body": {
+                  "success": true,
+                  "message": "Episódios obtidos com sucesso",
+                  "data": {
+                    "series_name": "Breaking Bad",
+                    "season": 1,
+                    "episodes": [
+                      {
+                        "id": "episode-uuid",
+                        "nome": "Breaking Bad",
+                        "nome_episodio": "Pilot",
+                        "temporada": 1,
+                        "episodio": 1,
+                        "rating": 8.2,
+                        "streaming_type": "hls",
+                        "episode_display": {
+                          "title": "Breaking Bad - S01E01",
+                          "episode_title": "Pilot",
+                          "season_episode": "S01E01"
+                        }
+                      }
+                    ],
+                    "seasons_grouped": [
+                      {
+                        "season_number": 1,
+                        "episodes": []
+                      }
+                    ],
+                    "series_stats": {
+                      "total_seasons": 5,
+                      "total_episodes": 62,
+                      "average_rating": 9.2
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "record_view": {
+            "method": "POST",
+            "path": "/{contentId}/view",
+            "description": "Registrar visualização e iniciar streaming",
+            "authentication": "Não requerida",
+            "path_parameters": {
+              "contentId": {
+                "type": "uuid",
+                "description": "ID do conteúdo",
+                "example": "550e8400-e29b-41d4-a716-446655440000"
+              }
+            },
+            "request_body": {
+              "user_id": {
+                "type": "uuid",
+                "description": "ID do usuário (opcional)",
+                "example": "user-uuid-here"
+              },
+              "profile_id": {
+                "type": "uuid",
+                "description": "ID do perfil (opcional)",
+                "example": "profile-uuid-here"
+              },
+              "intent": {
+                "type": "string",
+                "enum": ["watch", "rewatch", "preview"],
+                "default": "watch",
+                "description": "Intenção da visualização"
+              },
+              "quality_preference": {
+                "type": "string",
+                "enum": ["240p", "360p", "480p", "720p", "1080p", "1440p", "4k", "auto"],
+                "default": "auto",
+                "description": "Qualidade preferida"
+              },
+              "client_type": {
+                "type": "string",
+                "enum": ["browser", "mobile", "desktop_player", "smart_tv"],
+                "default": "browser",
+                "description": "Tipo de cliente"
+              },
+              "view_duration": {
+                "type": "integer",
+                "description": "Duração assistida em segundos (opcional)"
+              },
+              "view_percentage": {
+                "type": "number",
+                "description": "Percentual assistido (0-100, opcional)"
+              }
+            },
+            "example_request": {
+              "curl": "curl -X POST http://localhost:3000/api/v1/contents/550e8400-e29b-41d4-a716-446655440000/view -H 'Content-Type: application/json' -d '{\"user_id\": \"user-uuid\", \"intent\": \"watch\", \"quality_preference\": \"1080p\"}'",
+              "body": {
+                "user_id": "550e8400-e29b-41d4-a716-446655440001",
+                "profile_id": "550e8400-e29b-41d4-a716-446655440002",
+                "intent": "watch",
+                "quality_preference": "1080p",
+                "client_type": "browser"
+              }
+            },
+            "responses": {
+              "200_direct": {
+                "description": "Streaming direto disponível (HTTPS)",
+                "body": {
+                  "success": true,
+                  "message": "Streaming direto disponível",
+                  "data": {
+                    "type": "direct",
+                    "streaming_type": "hls",
+                    "streamUrl": "https://secure-server.com/playlist.m3u8",
+                    "content": {
+                      "id": "550e8400-e29b-41d4-a716-446655440000",
+                      "nome": "Breaking Bad - S01E01",
+                      "categoria": "serie",
+                      "poster": "https://example.com/poster.jpg"
+                    },
+                    "view": {
+                      "id": "view-uuid",
+                      "content_id": "550e8400-e29b-41d4-a716-446655440000",
+                      "created_at": "2025-01-20T14:30:00.000Z",
+                      "is_existing": false
+                    },
+                    "ready": true
+                  }
+                }
+              },
+              "200_proxy": {
+                "description": "Streaming via proxy (HTTP -> HTTPS)",
+                "body": {
+                  "success": true,
+                  "message": "Streaming via proxy disponível",
+                  "data": {
+                    "type": "proxy",
+                    "streaming_type": "hls",
+                    "proxyId": "content123_a1b2c3d4e5f6",
+                    "streamUrl": "http://localhost:3000/api/v1/proxy/stream/content123_a1b2c3d4e5f6",
+                    "originalUrl": "http://insecure-server.com/playlist.m3u8",
+                    "content": {
+                      "id": "550e8400-e29b-41d4-a716-446655440000",
+                      "nome": "Breaking Bad - S01E01"
+                    },
+                    "view": {
+                      "id": "view-uuid",
+                      "created_at": "2025-01-20T14:30:00.000Z",
+                      "is_existing": false
+                    },
+                    "proxy": {
+                      "proxyId": "content123_a1b2c3d4e5f6",
+                      "requiresAuth": false,
+                      "contentType": "application/vnd.apple.mpegurl"
+                    },
+                    "ready": true
+                  }
+                }
+              },
+              "400": {
+                "description": "Conteúdo não disponível",
+                "body": {
+                  "success": false,
+                  "message": "Conteúdo não está ativo"
+                }
+              }
+            }
+          }
+        },
+        "authenticated_routes": {
+          "list_contents": {
+            "method": "GET",
+            "path": "/",
+            "description": "Listar conteúdos com filtros avançados",
+            "authentication": "JWT Bearer Token",
+            "query_parameters": {
+              "categoria": {
+                "type": "string",
+                "enum": ["acao", "aventura", "comedia", "drama", "terror", "ficcao_cientifica", "fantasia", "romance", "thriller", "documentario", "animacao", "crime", "guerra", "historia", "musica", "misterio", "familia", "biografia"],
+                "description": "Filtrar por categoria"
+              },
+              "subcategoria": {
+                "type": "string",
+                "enum": ["filme", "serie", "anime", "desenho", "documentario", "curta", "minisserie", "reality_show", "talk_show", "esporte"],
+                "description": "Filtrar por subcategoria"
+              },
+              "ativo": {
+                "type": "boolean",
+                "description": "Filtrar apenas conteúdos ativos"
+              },
+              "rating_min": {
+                "type": "number",
+                "min": 0,
+                "max": 10,
+                "description": "Rating mínimo"
+              },
+              "rating_max": {
+                "type": "number",
+                "min": 0,
+                "max": 10,
+                "description": "Rating máximo"
+              },
+              "temporada": {
+                "type": "integer",
+                "description": "Filtrar por temporada específica"
+              },
+              "status_serie": {
+                "type": "string",
+                "enum": ["em_andamento", "finalizada", "cancelada", "pausada"],
+                "description": "Status da série"
+              },
+              "tmdb_hit": {
+                "type": "boolean",
+                "description": "Apenas conteúdos com dados TMDB"
+              },
+              "serie_nome": {
+                "type": "string",
+                "description": "Nome da série para filtrar"
+              },
+              "streaming_type": {
+                "type": "string",
+                "enum": ["hls", "dash", "progressive", "rtmp"],
+                "description": "Tipo de streaming"
+              },
+              "requires_proxy": {
+                "type": "boolean",
+                "description": "Filtrar conteúdos que precisam de proxy"
+              },
+              "search": {
+                "type": "string",
+                "description": "Busca textual em nome, descrição, etc."
+              },
+              "sort_by": {
+                "type": "string",
+                "enum": ["nome", "rating", "total_visualizations", "created_at", "temporada", "episodio"],
+                "default": "created_at",
+                "description": "Campo para ordenação"
+              },
+              "sort_order": {
+                "type": "string",
+                "enum": ["asc", "desc"],
+                "default": "desc",
+                "description": "Ordem de classificação"
+              },
+              "limit": {
+                "type": "integer",
+                "default": 20,
+                "min": 1,
+                "max": 100,
+                "description": "Número de itens por página"
+              },
+              "offset": {
+                "type": "integer",
+                "default": 0,
+                "description": "Deslocamento para paginação"
+              }
+            },
+            "example_request": {
+              "curl": "curl 'http://localhost:3000/api/v1/contents?categoria=drama&subcategoria=serie&limit=10&sort_by=rating' -H 'Authorization: Bearer eyJhbGc...'"
+            },
+            "responses": {
+              "200": {
+                "description": "Lista de conteúdos",
+                "body": {
+                  "success": true,
+                  "message": "Conteúdos obtidos com sucesso",
+                  "data": [
+                    {
+                      "id": "content-uuid",
+                      "nome": "Breaking Bad",
+                      "categoria": "drama",
+                      "subcategoria": "serie",
+                      "rating": 9.5,
+                      "view_count": 15420,
+                      "streaming_type": "hls",
+                      "requires_proxy": true,
+                      "serie_info": {},
+                      "streaming": {}
+                    }
+                  ],
+                  "pagination": {
+                    "total": 150,
+                    "limit": 20,
+                    "offset": 0,
+                    "hasMore": true
+                  }
+                }
+              }
+            }
+          },
+          "get_content_by_id": {
+            "method": "GET",
+            "path": "/{contentId}",
+            "description": "Obter conteúdo específico por ID",
+            "authentication": "JWT Bearer Token",
+            "path_parameters": {
+              "contentId": {
+                "type": "uuid",
+                "description": "ID do conteúdo",
+                "example": "550e8400-e29b-41d4-a716-446655440000"
+              }
+            },
+            "responses": {
+              "200": {
+                "description": "Detalhes completos do conteúdo",
+                "body": {
+                  "success": true,
+                  "message": "Conteúdo obtido com sucesso",
+                  "data": {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "nome": "Breaking Bad",
+                    "categoria": "drama",
+                    "subcategoria": "serie",
+                    "poster": "https://example.com/poster.jpg",
+                    "backdrop": "https://example.com/backdrop.jpg",
+                    "rating": 9.5,
+                    "view_count": 15420,
+                    "ativo": true,
+                    "temporada": 1,
+                    "episodio": 1,
+                    "nome_episodio": "Pilot",
+                    "is_series": true,
+                    "streaming_type": "hls",
+                    "requires_proxy": true,
+                    "has_backdrop": true,
+                    "has_poster": true,
+                    "has_tmdb_data": true,
+                    "qualidades": ["480p", "720p", "1080p"],
+                    "serie_info": {
+                      "nome_serie": "Breaking Bad",
+                      "descricao_serie": "Um professor de química...",
+                      "status_serie": "finalizada",
+                      "temporadas_total": 5,
+                      "episodios_total": 62,
+                      "temporada_atual": 1,
+                      "episodio_atual": 1,
+                      "nome_episodio": "Pilot",
+                      "descricao_episodio": "Walter White descobre..."
+                    },
+                    "tmdb_info": {
+                      "serie_id": 1396,
+                      "temporada_id": 3572,
+                      "episodio_id": 62085,
+                      "has_serie_data": true,
+                      "has_temporada_data": true,
+                      "has_episodio_data": true
+                    },
+                    "streaming": {
+                      "type": "hls",
+                      "original_url": "http://example.com/playlist.m3u8",
+                      "requires_proxy": true,
+                      "proxy_endpoints": {
+                        "create": "/api/v1/proxy/content/550e8400-e29b-41d4-a716-446655440000",
+                        "info": "/api/v1/proxy/info/{proxyId}"
+                      }
+                    },
+                    "metadata": {
+                      "duracao": 47,
+                      "ano_lancamento": 2008,
+                      "diretor": "Vince Gilligan",
+                      "generos_secundarios": ["crime", "thriller"]
+                    },
+                    "created_at": "2025-01-20T10:00:00.000Z",
+                    "updated_at": "2025-01-20T14:00:00.000Z"
+                  }
+                }
+              },
+              "404": {
+                "description": "Conteúdo não encontrado",
+                "body": {
+                  "success": false,
+                  "message": "Conteúdo não encontrado"
+                }
+              }
+            }
+          },
+          "get_streaming_status": {
+            "method": "GET",
+            "path": "/{contentId}/streaming-status",
+            "description": "Verificar status de disponibilidade para streaming",
+            "authentication": "JWT Bearer Token",
+            "path_parameters": {
+              "contentId": {
+                "type": "uuid",
+                "description": "ID do conteúdo"
+              }
+            },
+            "responses": {
+              "200_ready": {
+                "description": "Conteúdo pronto para streaming",
+                "body": {
+                  "success": true,
+                  "message": "Conteúdo pronto para streaming",
+                  "data": {
+                    "status": "ready",
+                    "ready": true,
+                    "streaming_type": "hls",
+                    "requires_proxy": true,
+                    "content_type": "application/vnd.apple.mpegurl",
+                    "url_available": true
+                  }
+                }
+              },
+              "200_error": {
+                "description": "Conteúdo não disponível",
+                "body": {
+                  "success": false,
+                  "message": "Conteúdo não disponível para streaming",
+                  "data": {
+                    "status": "error",
+                    "ready": false,
+                    "reason": "URL de transmissão inválida"
+                  }
+                }
+              }
+            }
+          },
+          "get_recommendations": {
+            "method": "GET",
+            "path": "/user/recommendations",
+            "description": "Obter recomendações personalizadas",
+            "authentication": "JWT Bearer Token",
+            "query_parameters": {
+              "limit": {
+                "type": "integer",
+                "default": 10,
+                "min": 1,
+                "max": 50,
+                "description": "Número de recomendações"
+              },
+              "category": {
+                "type": "string",
+                "description": "Categoria específica para recomendações"
+              },
+              "exclude_viewed": {
+                "type": "boolean",
+                "default": false,
+                "description": "Excluir conteúdos já visualizados"
+              },
+              "include_series": {
+                "type": "boolean",
+                "default": true,
+                "description": "Incluir séries nas recomendações"
+              }
+            },
+            "responses": {
+              "200": {
+                "description": "Lista de recomendações",
+                "body": {
+                  "success": true,
+                  "message": "Recomendações obtidas com sucesso",
+                  "data": [
+                    {
+                      "id": "content-uuid",
+                      "nome": "Better Call Saul",
+                      "categoria": "drama",
+                      "rating": 8.8,
+                      "reason": "Baseado em suas preferências de drama"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "admin_routes": {
+          "create_content": {
+            "method": "POST",
+            "path": "/",
+            "description": "Criar novo conteúdo",
+            "authentication": "JWT Bearer Token (Admin)",
+            "request_body": {
+              "nome": {
+                "type": "string",
+                "required": true,
+                "max_length": 255,
+                "description": "Nome do conteúdo",
+                "example": "Breaking Bad"
+              },
+              "url_transmissao": {
+                "type": "string",
+                "required": true,
+                "max_length": 500,
+                "description": "URL de streaming (HTTP/HTTPS, M3U8, MP4, etc.)",
+                "example": "http://example.com/playlist.m3u8"
+              },
+              "poster": {
+                "type": "string",
+                "format": "url",
+                "max_length": 500,
+                "description": "URL do poster",
+                "example": "https://example.com/poster.jpg"
+              },
+              "backdrop": {
+                "type": "string",
+                "format": "url",
+                "max_length": 500,
+                "description": "URL do backdrop",
+                "example": "https://example.com/backdrop.jpg"
+              },
+              "categoria": {
+                "type": "string",
+                "required": true,
+                "enum": ["acao", "aventura", "comedia", "drama", "terror", "ficcao_cientifica", "fantasia", "romance", "thriller", "documentario", "animacao", "crime", "guerra", "historia", "musica", "misterio", "familia", "biografia"],
+                "description": "Categoria do conteúdo"
+              },
+              "subcategoria": {
+                "type": "string",
+                "required": true,
+                "enum": ["filme", "serie", "anime", "desenho", "documentario", "curta", "minisserie", "reality_show", "talk_show", "esporte"],
+                "description": "Subcategoria do conteúdo"
+              },
+              "ativo": {
+                "type": "boolean",
+                "default": true,
+                "description": "Se o conteúdo está ativo"
+              },
+              "temporada": {
+                "type": "integer",
+                "min": 1,
+                "description": "Número da temporada (obrigatório para séries)",
+                "example": 1
+              },
+              "episodio": {
+                "type": "integer",
+                "min": 1,
+                "description": "Número do episódio (obrigatório para séries)",
+                "example": 1
+              },
+              "nome_episodio": {
+                "type": "string",
+                "max_length": 255,
+                "description": "Nome do episódio",
+                "example": "Pilot"
+              },
+              "descricao_serie": {
+                "type": "string",
+                "max_length": 2000,
+                "description": "Descrição da série"
+              },
+              "descricao_temporada": {
+                "type": "string",
+                "max_length": 2000,
+                "description": "Descrição da temporada"
+              },
+              "descricao_episodio": {
+                "type": "string",
+                "max_length": 2000,
+                "description": "Descrição do episódio"
+              },
+              "status_serie": {
+                "type": "string",
+                "enum": ["em_andamento", "finalizada", "cancelada", "pausada"],
+                "description": "Status da série"
+              },
+              "episodios_total": {
+                "type": "integer",
+                "min": 1,
+                "description": "Total de episódios da série"
+              },
+              "temporadas_total": {
+                "type": "integer",
+                "min": 1,
+                "description": "Total de temporadas da série"
+              },
+              "rating": {
+                "type": "number",
+                "min": 0,
+                "max": 10,
+                "default": 0,
+                "description": "Rating do conteúdo (0-10)"
+              },
+              "qualidades": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": ["480p", "720p", "1080p", "1440p", "4k", "auto"]
+                },
+                "default": ["auto"],
+                "description": "Qualidades disponíveis"
+              },
+              "tmdb_hit": {
+                "type": "boolean",
+                "default": false,
+                "description": "Se tem dados do TMDB"
+              },
+              "tmdb_serie_id": {
+                "type": "integer",
+                "description": "ID da série no TMDB"
+              },
+              "tmdb_temporada_id": {
+                "type": "integer",
+                "description": "ID da temporada no TMDB"
+              },
+              "tmdb_episodio_id": {
+                "type": "integer",
+                "description": "ID do episódio no TMDB"
+              },
+              "metadata": {
+                "type": "object",
+                "description": "Metadados adicionais (diretor, elenco, etc.)",
+                "properties": {
+                  "duracao": {
+                    "type": "integer",
+                    "description": "Duração em minutos"
+                  },
+                  "ano_lancamento": {
+                    "type": "integer",
+                    "description": "Ano de lançamento"
+                  },
+                  "diretor": {
+                    "type": "string",
+                    "description": "Nome do diretor"
+                  },
+                  "elenco": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Lista do elenco principal"
+                  }
+                }
+              }
+            },
+            "example_request": {
+              "curl": "curl -X POST http://localhost:3000/api/v1/contents -H 'Authorization: Bearer ADMIN_TOKEN' -H 'Content-Type: application/json' -d @content.json",
+              "body": {
+                "nome": "Breaking Bad",
+                "url_transmissao": "http://example.com/breaking-bad-s01e01.m3u8",
+                "poster": "https://example.com/poster.jpg",
+                "categoria": "drama",
+                "subcategoria": "serie",
+                "temporada": 1,
+                "episodio": 1,
+                "nome_episodio": "Pilot",
+                "descricao_serie": "Um professor de química do ensino médio...",
+                "status_serie": "finalizada",
+                "rating": 8.2,
+                "qualidades": ["720p", "1080p"],
+                "tmdb_hit": true,
+                "tmdb_serie_id": 1396,
+                "metadata": {
+                  "duracao": 47,
+                  "ano_lancamento": 2008,
+                  "diretor": "Vince Gilligan"
+                }
+              }
+            },
+            "responses": {
+              "201": {
+                "description": "Conteúdo criado com sucesso",
+                "body": {
+                  "success": true,
+                  "message": "Conteúdo criado com sucesso",
+                  "data": {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "nome": "Breaking Bad",
+                    "categoria": "drama",
+                    "subcategoria": "serie",
+                    "streaming_type": "hls",
+                    "requires_proxy": true,
+                    "created_at": "2025-01-20T14:30:00.000Z"
+                  }
+                }
+              },
+              "400": {
+                "description": "Dados inválidos",
+                "examples": {
+                  "validation_error": {
+                    "success": false,
+                    "message": "Dados inválidos",
+                    "errors": [
+                      {
+                        "field": "temporada",
+                        "message": "Temporada é obrigatória para séries"
+                      }
+                    ]
+                  },
+                  "episode_exists": {
+                    "success": false,
+                    "message": "Episódio 1x1 da série \"Breaking Bad\" já existe"
+                  },
+                  "invalid_url": {
+                    "success": false,
+                    "message": "URL de streaming inválida"
+                  }
+                }
+              }
+            }
+          },
+          "update_content": {
+            "method": "PUT",
+            "path": "/{contentId}",
+            "description": "Atualizar conteúdo existente",
+            "authentication": "JWT Bearer Token (Admin)",
+            "path_parameters": {
+              "contentId": {
+                "type": "uuid",
+                "description": "ID do conteúdo a ser atualizado"
+              }
+            },
+            "request_body": {
+              "description": "Campos a serem atualizados (todos opcionais)",
+              "fields": "Mesmos campos da criação, todos opcionais"
+            },
+            "example_request": {
+              "body": {
+                "rating": 9.5,
+                "ativo": true,
+                "qualidades": ["480p", "720p", "1080p", "4k"],
+                "metadata": {
+                  "duracao": 47,
+                  "premios": ["Emmy 2013", "Emmy 2014"]
+                }
+              }
+            },
+            "responses": {
+              "200": {
+                "description": "Conteúdo atualizado com sucesso",
+                "body": {
+                  "success": true,
+                  "message": "Conteúdo atualizado com sucesso",
+                  "data": {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "rating": 9.5,
+                    "updated_at": "2025-01-20T15:00:00.000Z"
+                  }
+                }
+              },
+              "404": {
+                "description": "Conteúdo não encontrado",
+                "body": {
+                  "success": false,
+                  "message": "Conteúdo não encontrado"
+                }
+              }
+            }
+          },
+          "delete_content": {
+            "method": "DELETE",
+            "path": "/{contentId}",
+            "description": "Excluir conteúdo",
+            "authentication": "JWT Bearer Token (Admin)",
+            "path_parameters":"contentId" {
+             "type": "uuid",
+             "description": "ID do conteúdo a ser excluído"
+           }
+        }
+        },
+        "responses": {
+          "200": {
+            "description": "Conteúdo excluído com sucesso",
+            "body": {
+              "success": true,
+              "message": "Conteúdo excluído com sucesso"
+            }
+          },
+          "404": {
+            "description": "Conteúdo não encontrado",
+            "body": {
+              "success": false,
+              "message": "Conteúdo não encontrado"
+            }
+          }
+        }
+      },
+      "get_content_stats": {
+        "method": "GET",
+        "path": "/admin/stats",
+        "description": "Obter estatísticas gerais de conteúdo",
+        "authentication": "JWT Bearer Token (Admin)",
+        "responses": {
+          "200": {
+            "description": "Estatísticas gerais",
+            "body": {
+              "success": true,
+              "message": "Estatísticas obtidas com sucesso",
+              "data": {
+                "totalContents": 1250,
+                "totalViews": 45678,
+                "tmdbHits": 890,
+                "tmdbHitRate": 71,
+                "uniqueSeries": 125,
+                "categoryStats": [
+                  {
+                    "categoria": "drama",
+                    "count": 245
+                  },
+                  {
+                    "categoria": "acao",
+                    "count": 189
+                  }
+                ],
+                "subcategoryStats": [
+                  {
+                    "subcategoria": "serie",
+                    "count": 678
+                  },
+                  {
+                    "subcategoria": "filme",
+                    "count": 572
+                  }
+                ],
+                "seriesStatusStats": [
+                  {
+                    "status": "finalizada",
+                    "count": 89
+                  },
+                  {
+                    "status": "em_andamento",
+                    "count": 36
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "get_content_view_stats": {
+        "method": "GET",
+        "path": "/{contentId}/stats",
+        "description": "Obter estatísticas de visualização de um conteúdo específico",
+        "authentication": "JWT Bearer Token (Admin)",
+        "path_parameters": {
+          "contentId": {
+            "type": "uuid",
+            "description": "ID do conteúdo"
+          }
+        },
+        "query_parameters": {
+          "timeRange": {
+            "type": "string",
+            "enum": ["1d", "7d", "30d"],
+            "default": "7d",
+            "description": "Período para estatísticas"
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Estatísticas de visualização",
+            "body": {
+              "success": true,
+              "message": "Estatísticas de visualização obtidas com sucesso",
+              "data": {
+                "content": {
+                  "id": "550e8400-e29b-41d4-a716-446655440000",
+                  "nome": "Breaking Bad - S01E01",
+                  "view_count": 1542
+                },
+                "viewStats": [
+                  {
+                    "created_at": "2025-01-20T10:00:00.000Z",
+                    "view_duration": 2820,
+                    "view_percentage": 100
+                  }
+                ],
+                "uniqueViewsCount": 1234,
+                "totalViews": 1542
+              }
+            }
+          }
+        }
+      },
+      "test_content_connectivity": {
+        "method": "POST",
+        "path": "/{contentId}/test-connectivity",
+        "description": "Testar conectividade da URL de streaming",
+        "authentication": "JWT Bearer Token (Admin)",
+        "path_parameters": {
+          "contentId": {
+            "type": "uuid",
+            "description": "ID do conteúdo a ser testado"
+          }
+        },
+        "request_body": {
+          "timeout": {
+            "type": "integer",
+            "default": 10000,
+            "min": 1000,
+            "max": 30000,
+            "description": "Timeout em milissegundos"
+          },
+          "check_proxy": {
+            "type": "boolean",
+            "default": true,
+            "description": "Verificar se precisa de proxy"
+          },
+          "follow_redirects": {
+            "type": "boolean",
+            "default": true,
+            "description": "Seguir redirecionamentos"
+          }
+        },
+        "example_request": {
+          "body": {
+            "timeout": 15000,
+            "check_proxy": true,
+            "follow_redirects": true
+          }
+        },
+        "responses": {
+          "200_success": {
+            "description": "Teste bem-sucedido",
+            "body": {
+              "success": true,
+              "message": "Conectividade testada com sucesso",
+              "data": {
+                "contentId": "550e8400-e29b-41d4-a716-446655440000",
+                "url": "http://example.com/playlist.m3u8",
+                "status": "success",
+                "statusCode": 200,
+                "responseTime": 245,
+                "contentType": "application/vnd.apple.mpegurl",
+                "contentLength": "2048",
+                "streaming_type": "hls",
+                "requires_proxy": true
+              }
+            }
+          },
+          "200_error": {
+            "description": "Teste com falha",
+            "body": {
+              "success": false,
+              "message": "Falha no teste de conectividade",
+              "data": {
+                "contentId": "550e8400-e29b-41d4-a716-446655440000",
+                "status": "error",
+                "error": "ENOTFOUND",
+                "code": "ENOTFOUND"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "integration_workflows": {
+    "admin_content_creation": {
+      "description": "Fluxo completo de criação de conteúdo pelo admin",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Login como admin",
+          "endpoint": "POST /api/v1/auth/login",
+          "example": "curl -X POST /api/v1/auth/login -d '{\"email\":\"admin@example.com\",\"senha\":\"password\"}'"
+        },
+        {
+          "step": 2,
+          "action": "Testar URL de streaming (opcional)",
+          "endpoint": "POST /api/v1/proxy/admin/test-url",
+          "example": "curl -X POST /api/v1/proxy/admin/test-url -H 'Authorization: Bearer TOKEN' -d '{\"url\":\"http://example.com/video.m3u8\"}'"
+        },
+        {
+          "step": 3,
+          "action": "Criar conteúdo",
+          "endpoint": "POST /api/v1/contents",
+          "example": "curl -X POST /api/v1/contents -H 'Authorization: Bearer TOKEN' -d @content.json"
+        },
+        {
+          "step": 4,
+          "action": "Verificar conectividade",
+          "endpoint": "POST /api/v1/contents/{contentId}/test-connectivity",
+          "example": "curl -X POST /api/v1/contents/UUID/test-connectivity -H 'Authorization: Bearer TOKEN'"
+        }
+      ]
+    },
+    "user_streaming_workflow": {
+      "description": "Fluxo completo de streaming para usuário",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Buscar conteúdo",
+          "endpoint": "GET /api/v1/contents",
+          "example": "curl '/api/v1/contents?search=breaking bad&limit=10' -H 'Authorization: Bearer TOKEN'"
+        },
+        {
+          "step": 2,
+          "action": "Obter detalhes do conteúdo",
+          "endpoint": "GET /api/v1/contents/{contentId}",
+          "example": "curl /api/v1/contents/UUID -H 'Authorization: Bearer TOKEN'"
+        },
+        {
+          "step": 3,
+          "action": "Verificar status de streaming",
+          "endpoint": "GET /api/v1/contents/{contentId}/streaming-status",
+          "example": "curl /api/v1/contents/UUID/streaming-status -H 'Authorization: Bearer TOKEN'"
+        },
+        {
+          "step": 4,
+          "action": "Iniciar visualização",
+          "endpoint": "POST /api/v1/contents/{contentId}/view",
+          "example": "curl -X POST /api/v1/contents/UUID/view -d '{\"user_id\":\"UUID\",\"intent\":\"watch\"}'"
+        },
+        {
+          "step": 5,
+          "action": "Usar URL de streaming retornada",
+          "description": "Usar streamUrl retornado na resposta anterior no player de vídeo"
+        }
+      ]
+    },
+    "series_browsing_workflow": {
+      "description": "Navegação em séries",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Listar séries",
+          "endpoint": "GET /api/v1/contents?subcategoria=serie",
+          "example": "curl '/api/v1/contents?subcategoria=serie&sort_by=rating' -H 'Authorization: Bearer TOKEN'"
+        },
+        {
+          "step": 2,
+          "action": "Obter episódios de uma série",
+          "endpoint": "GET /api/v1/contents/series/{seriesName}/episodes",
+          "example": "curl '/api/v1/contents/series/Breaking%20Bad/episodes?season=1'"
+        },
+        {
+          "step": 3,
+          "action": "Assistir episódio específico",
+          "endpoint": "POST /api/v1/contents/{episodeId}/view",
+          "example": "curl -X POST /api/v1/contents/EPISODE_UUID/view -d '{\"intent\":\"watch\"}'"
+        }
+      ]
+    }
+  },
+  "streaming_types_explanation": {
+    "direct_streaming": {
+      "description": "Usado quando a URL original já é HTTPS ou o ambiente não requer proxy",
+      "when_used": "URL original é HTTPS, ambiente de desenvolvimento HTTP",
+      "response_type": "direct",
+      "stream_url": "URL original do conteúdo"
+    },
+    "proxy_streaming": {
+      "description": "Usado quando URL original é HTTP mas o cliente está em HTTPS",
+      "when_used": "URL original é HTTP, ambiente de produção HTTPS",
+      "response_type": "proxy",
+      "stream_url": "URL do proxy interno (/api/v1/proxy/stream/{proxyId})",
+      "additional_info": "Proxy automaticamente converte HTTP para HTTPS e modifica playlists M3U8"
+    }
+  },
+  "error_handling": {
+    "validation_errors": {
+      "status_code": 400,
+      "description": "Dados de entrada inválidos",
+      "response_format": {
+        "success": false,
+        "message": "Dados inválidos",
+        "errors": [
+          {
+            "field": "nome_do_campo",
+            "message": "Descrição do erro",
+            "code": "codigo_do_erro"
+          }
+        ]
+      }
+    },
+    "authentication_errors": {
+      "401": {
+        "description": "Token não fornecido ou inválido",
+        "response": {
+          "success": false,
+          "message": "Token de acesso não fornecido"
+        }
+      },
+      "403": {
+        "description": "Usuário não é admin (para rotas admin)",
+        "response": {
+          "success": false,
+          "message": "Acesso negado. Apenas administradores podem acessar este recurso."
+        }
+      }
+    },
+    "content_errors": {
+      "404": {
+        "description": "Conteúdo não encontrado",
+        "response": {
+          "success": false,
+          "message": "Conteúdo não encontrado"
+        }
+      },
+      "400": {
+        "description": "Conteúdo não disponível para streaming",
+        "response": {
+          "success": false,
+          "message": "Conteúdo não está ativo"
+        }
+      }
+    },
+    "streaming_errors": {
+      "500": {
+        "description": "Erro interno no streaming",
+        "response": {
+          "success": false,
+          "message": "Erro ao configurar streaming",
+          "data": {
+            "content": {},
+            "error": "Tipo de streaming não reconhecido"
+          }
+        }
+      }
+    }
+  },
+  "best_practices": {
+    "content_creation": {
+      "series_management": "Para séries, sempre fornecer temporada e episódio. Verificar se episódio já existe antes de criar.",
+      "url_validation": "Sempre testar URLs de streaming antes de criar conteúdo em produção.",
+      "metadata_organization": "Usar metadados estruturados para facilitar buscas e filtros.",
+      "tmdb_integration": "Quando possível, incluir dados TMDB para melhor experiência do usuário."
+    },
+    "streaming_optimization": {
+      "proxy_usage": "Sistema detecta automaticamente quando usar proxy. URLs HTTP em ambiente HTTPS são automaticamente proxificadas.",
+      "quality_selection": "Oferecer múltiplas qualidades e deixar player escolher automaticamente baseado na conexão.",
+      "cache_strategy": "Proxy implementa cache inteligente para otimizar performance.",
+      "monitoring": "Usar endpoints de teste de conectividade para monitorar saúde dos streams."
+    },
+    "user_experience": {
+      "search_implementation": "Implementar busca textual nos campos nome, descrição de série, episódio, etc.",
+      "pagination": "Sempre implementar paginação adequada para listas grandes.",
+      "error_feedback": "Fornecer feedback claro sobre problemas de streaming.",
+      "recommendations": "Usar endpoint de recomendações para melhorar descoberta de conteúdo."
+    },
+    "performance": {
+      "caching": "Implementar cache local para metadados de conteúdo.",
+      "lazy_loading": "Carregar posters e backdrops de forma lazy.",
+      "batch_operations": "Para operações em lote, considerar criar endpoints específicos.",
+      "monitoring": "Monitorar estatísticas de visualização e performance de streaming."
+    }
+  },
+  "response_examples": {
+    "complete_content_object": {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "nome": "Breaking Bad",
+      "categoria": "drama",
+      "subcategoria": "serie",
+      "poster": "https://image.tmdb.org/t/p/w500/poster.jpg",
+      "backdrop": "https://image.tmdb.org/t/p/w1280/backdrop.jpg",
+      "rating": 9.5,
+      "view_count": 15420,
+      "ativo": true,
+      "temporada": 1,
+      "episodio": 1,
+      "nome_episodio": "Pilot",
+      "is_series": true,
+      "streaming_type": "hls",
+      "requires_proxy": true,
+      "has_backdrop": true,
+      "has_poster": true,
+      "has_tmdb_data": true,
+      "qualidades": ["480p", "720p", "1080p"],
+      "serie_info": {
+        "nome_serie": "Breaking Bad",
+        "descricao_serie": "Um professor de química do ensino médio diagnosticado com câncer pulmonar inoperável se volta para a fabricação e venda de metanfetamina...",
+        "status_serie": "finalizada",
+        "temporadas_total": 5,
+        "episodios_total": 62,
+        "temporada_atual": 1,
+        "episodio_atual": 1,
+        "nome_episodio": "Pilot",
+        "descricao_temporada": "Walter White, um professor de química...",
+        "descricao_episodio": "No primeiro episódio, Walter descobre seu diagnóstico..."
+      },
+      "tmdb_info": {
+        "serie_id": 1396,
+        "temporada_id": 3572,
+        "episodio_id": 62085,
+        "has_serie_data": true,
+        "has_temporada_data": true,
+        "has_episodio_data": true
+      },
+      "streaming": {
+        "type": "hls",
+        "original_url": "http://example.com/breaking-bad/s01e01/playlist.m3u8",
+        "requires_proxy": true,
+        "proxy_endpoints": {
+          "create": "/api/v1/proxy/content/550e8400-e29b-41d4-a716-446655440000",
+          "info": "/api/v1/proxy/info/{proxyId}"
+        }
+      },
+      "metadata": {
+        "duracao": 58,
+        "ano_lancamento": 2008,
+        "diretor": "Vince Gilligan",
+        "elenco": ["Bryan Cranston", "Aaron Paul", "Anna Gunn"],
+        "generos_secundarios": ["crime", "thriller"],
+        "idade_recomendada": "16+",
+        "idioma": "en",
+        "legendas": ["pt-BR", "en", "es"],
+        "estudio": "Sony Pictures Television",
+        "pais_origem": "Estados Unidos",
+        "premios": ["Emmy 2013", "Emmy 2014"],
+        "imdb_id": "tt0903747"
+      },
+      "created_at": "2025-01-20T10:00:00.000Z",
+      "updated_at": "2025-01-20T14:00:00.000Z"
+    }
+  }
+}

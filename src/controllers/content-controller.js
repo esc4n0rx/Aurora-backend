@@ -1,8 +1,7 @@
 const ContentService = require('../services/content-service');
 const LoggingService = require('../services/logging-service');
 const { ACTION_TYPES } = require('../utils/action-types');
-const TorrentUtils = require('../utils/torrent-utils');
-const torrentService = require('../services/torrent-service');
+const ContentUtils = require('../utils/content-utils');
 
 class ContentController {
     /**
@@ -23,7 +22,8 @@ class ContentController {
                     categoria: content.categoria,
                     subcategoria: content.subcategoria,
                     isSeries: content.is_series,
-                    isTorrent: TorrentUtils.isMagnetLink(content.url_transmissao)
+                    streamingType: content.streaming_type,
+                    requiresProxy: content.streaming.requires_proxy
                 },
                 request: req,
                 statusCode: 201
@@ -97,32 +97,17 @@ class ContentController {
             const { contentId } = req.params;
             const content = await ContentService.getContentById(contentId);
             
-            // Detectar se é torrent e adicionar informações de streaming
-            let streamingInfo = null;
-            if (TorrentUtils.isMagnetLink(content.url_transmissao)) {
-                streamingInfo = {
-                    isTorrent: true,
-                    streamId: TorrentUtils.generateStreamId(content.url_transmissao),
-                    streamStartUrl: `/api/v1/stream/content/${contentId}/start`,
-                    streamPlayUrl: `/api/v1/stream/content/${contentId}/play`
-                };
-            } else {
-                streamingInfo = {
-                    isTorrent: false,
-                    directUrl: content.url_transmissao
-                };
-            }
-            
             // Log do acesso
             await LoggingService.logUserAction({
                 userId: req.user.userId,
                 actionType: ACTION_TYPES.CONTENT_ACCESS,
-                description: 'Content accessed by admin',
+                description: 'Content accessed',
                 metadata: {
                     contentId: content.id,
                     contentName: content.nome,
                     categoria: content.categoria,
-                    isTorrent: streamingInfo.isTorrent
+                    streamingType: content.streaming_type,
+                    requiresProxy: content.streaming.requires_proxy
                 },
                 request: req,
                 statusCode: 200
@@ -131,10 +116,7 @@ class ContentController {
             res.json({
                 success: true,
                 message: 'Conteúdo obtido com sucesso',
-                data: {
-                    ...content,
-                    streaming: streamingInfo
-                }
+                data: content
             });
         } catch (error) {
             if (error.message.includes('não encontrado')) {
@@ -164,7 +146,7 @@ class ContentController {
                     contentId: content.id,
                     contentName: content.nome,
                     updatedFields: Object.keys(req.body),
-                    isTorrent: TorrentUtils.isMagnetLink(content.url_transmissao)
+                    streamingType: content.streaming_type
                 },
                 request: req,
                 statusCode: 200
@@ -249,16 +231,16 @@ class ContentController {
     }
 
     /**
-     * Registrar visualização de conteúdo (CORRIGIDO)
+     * Registrar visualização de conteúdo (ATUALIZADA - SEM TORRENT)
      */
     static async recordView(req, res, next) {
         try {
             const { contentId } = req.params;
-            const { intent = 'watch' } = req.body; // Novo parâmetro
+            const { intent = 'watch' } = req.body;
             const ipAddress = req.ip || req.connection?.remoteAddress || 'unknown';
             const userAgent = req.get('User-Agent') || 'unknown';
             
-            // Usar serviço simplificado
+            // Usar serviço atualizado sem torrent
             const result = await ContentService.startStreaming(
                 contentId, 
                 req.body, 
@@ -278,8 +260,10 @@ class ContentController {
                     contentName: result.content.nome,
                     intent,
                     streamType: result.streaming.type,
+                    streamingType: result.content.streaming_type,
                     viewRegistered: !!result.view && !result.view.is_existing,
-                    isRewatch: intent === 'rewatch'
+                    isRewatch: intent === 'rewatch',
+                    requiresProxy: result.streaming.type === 'proxy'
                 },
                 request: req,
                 statusCode: 200
@@ -292,39 +276,39 @@ class ContentController {
                     message: 'Streaming direto disponível',
                     data: {
                         type: 'direct',
+                        streaming_type: result.streaming.streaming_type,
                         streamUrl: result.streaming.url,
                         content: result.content,
-                        view: result.view
+                        view: result.view,
+                        ready: true
                     }
                 });
-            } else if (result.streaming.type === 'torrent') {
-                if (result.streaming.status === 'failed') {
-                    res.status(202).json({
-                        success: false,
-                        message: 'Falha ao iniciar torrent, tente novamente',
-                        data: {
-                            type: 'torrent',
-                            status: 'failed',
-                            content: result.content,
-                            retry: true,
-                            retryUrl: `/api/v1/contents/${contentId}/view`
-                        }
-                    });
-                } else {
-                    res.status(202).json({
-                        success: true,
-                        message: 'Stream de torrent iniciado',
-                        data: {
-                            type: 'torrent',
-                            status: 'initializing',
-                            streamId: result.streaming.streamId,
-                            statusUrl: result.streaming.statusUrl,
-                            content: result.content,
-                            view: result.view,
-                            nextStep: 'poll_status'
-                        }
-                    });
-                }
+            } else if (result.streaming.type === 'proxy') {
+                res.json({
+                    success: true,
+                    message: 'Streaming via proxy disponível',
+                    data: {
+                        type: 'proxy',
+                        streaming_type: result.streaming.streaming_type,
+                        proxyId: result.streaming.proxyId,
+                        streamUrl: result.streaming.streamUrl,
+                        originalUrl: result.streaming.originalUrl,
+                        content: result.content,
+                        view: result.view,
+                        proxy: result.proxy,
+                        ready: true
+                    }
+                });
+            } else {
+                // Fallback para erro
+                res.status(500).json({
+                    success: false,
+                    message: 'Erro ao configurar streaming',
+                    data: {
+                        content: result.content,
+                        error: 'Tipo de streaming não reconhecido'
+                    }
+                });
             }
             
         } catch (error) {
@@ -348,6 +332,25 @@ class ContentController {
                     message: error.message
                 });
             }
+            next(error);
+        }
+    }
+
+    /**
+     * Obter status de streaming do conteúdo
+     */
+    static async getStreamingStatus(req, res, next) {
+        try {
+            const { contentId } = req.params;
+            
+            const status = await ContentService.getStreamingStatus(contentId);
+            
+            res.json({
+                success: status.ready,
+                message: status.ready ? 'Conteúdo pronto para streaming' : 'Conteúdo não disponível para streaming',
+                data: status
+            });
+        } catch (error) {
             next(error);
         }
     }
@@ -404,7 +407,7 @@ class ContentController {
                 metadata: {
                     seriesName,
                     season: season || 'all',
-                    episodesCount: episodes.length
+                    episodesCount: episodes.episodes.length
                 },
                 request: req,
                 statusCode: 200
@@ -485,6 +488,68 @@ class ContentController {
                     message: error.message
                 });
             }
+            next(error);
+        }
+    }
+
+    /**
+     * Testar conectividade de conteúdo (admin)
+     */
+    static async testContentConnectivity(req, res, next) {
+        try {
+            const { contentId } = req.params;
+            
+            const testResult = await ContentService.testContentConnectivity(contentId);
+            
+            // Log do teste
+            await LoggingService.logUserAction({
+                userId: req.user.userId,
+                actionType: ACTION_TYPES.CONTENT_STATS,
+                description: 'Content connectivity tested',
+                metadata: testResult,
+                request: req,
+                statusCode: 200
+            });
+            
+            res.json({
+                success: testResult.status === 'success',
+                message: testResult.status === 'success' ? 'Conectividade testada com sucesso' : 'Falha no teste de conectividade',
+                data: testResult
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+
+    /**
+     * Obter recomendações para usuário
+     */
+    static async getRecommendations(req, res, next) {
+        try {
+            const { limit = 10 } = req.query;
+            const userId = req.user.userId;
+            
+            const recommendations = await ContentService.getRecommendations(userId, parseInt(limit));
+            
+            // Log do acesso
+            await LoggingService.logUserAction({
+                userId,
+                actionType: ACTION_TYPES.CONTENT_LIST,
+                description: 'Content recommendations accessed',
+                metadata: {
+                    limit: parseInt(limit),
+                    recommendationsCount: recommendations.length
+                },
+                request: req,
+                statusCode: 200
+            });
+            
+            res.json({
+                success: true,
+                message: 'Recomendações obtidas com sucesso',
+                data: recommendations
+            });
+        } catch (error) {
             next(error);
         }
     }

@@ -7,7 +7,9 @@ const {
     createContentValidation, 
     updateContentValidation,
     listContentValidation,
-    recordViewValidation
+    recordViewValidation,
+    testConnectivityValidation,
+    recommendationsValidation
 } = require('../validations/content-validations');
 
 const router = express.Router();
@@ -19,7 +21,7 @@ router.get('/popular', ContentController.getPopularContents);
 // Obter episódios de uma série
 router.get('/series/:seriesName/episodes', ContentController.getSeriesEpisodes);
 
-// Registrar visualização de conteúdo
+// Registrar visualização de conteúdo (atualizada)
 router.post('/:contentId/view', 
     validateData(recordViewValidation), 
     ContentController.recordView
@@ -37,6 +39,15 @@ router.get('/',
 
 // Obter conteúdo por ID
 router.get('/:contentId', ContentController.getContentById);
+
+// Obter status de streaming do conteúdo
+router.get('/:contentId/streaming-status', ContentController.getStreamingStatus);
+
+// Obter recomendações personalizadas
+router.get('/user/recommendations',
+    validateData(recommendationsValidation),
+    ContentController.getRecommendations
+);
 
 // Middleware de admin para rotas administrativas
 router.use(requireAdmin);
@@ -62,5 +73,11 @@ router.get('/admin/stats', ContentController.getContentStats);
 
 // Obter estatísticas de visualização de um conteúdo
 router.get('/:contentId/stats', ContentController.getContentViewStats);
+
+// Testar conectividade de um conteúdo
+router.post('/:contentId/test-connectivity',
+    validateData(testConnectivityValidation),
+    ContentController.testContentConnectivity
+);
 
 module.exports = router;
