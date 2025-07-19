@@ -26,6 +26,13 @@ class ContentUtils {
     ];
 
     /**
+     * Status de série disponíveis
+     */
+    static SERIE_STATUS = [
+        'em_andamento', 'finalizada', 'cancelada', 'pausada'
+    ];
+
+    /**
      * Validar categoria
      */
     static isValidCategory(category) {
@@ -58,16 +65,50 @@ class ContentUtils {
     }
 
     /**
+     * Validar status de série
+     */
+    static isValidSerieStatus(status) {
+        return this.SERIE_STATUS.includes(status);
+    }
+
+    /**
      * Formatar dados de conteúdo para resposta
      */
     static formatContentResponse(content) {
+        const isSeries = this.isSeries(content.subcategoria);
+        
         const formatted = {
             ...content,
-            is_series: this.isSeries(content.subcategoria),
+            is_series: isSeries,
             view_count: content.total_visualizations || 0,
             is_torrent: TorrentUtils.isMagnetLink(content.url_transmissao),
             has_backdrop: !!content.backdrop,
-            has_poster: !!content.poster
+            has_poster: !!content.poster,
+            has_tmdb_data: !!content.tmdb_hit,
+            
+            // Informações específicas de série
+            serie_info: isSeries ? {
+                nome_serie: content.nome,
+                descricao_serie: content.descricao_serie,
+                status_serie: content.status_serie,
+                temporadas_total: content.temporadas_total,
+                episodios_total: content.episodios_total,
+                temporada_atual: content.temporada,
+                episodio_atual: content.episodio,
+                nome_episodio: content.nome_episodio,
+                descricao_temporada: content.descricao_temporada,
+                descricao_episodio: content.descricao_episodio
+            } : null,
+            
+            // Informações TMDB
+            tmdb_info: content.tmdb_hit ? {
+                serie_id: content.tmdb_serie_id,
+                temporada_id: content.tmdb_temporada_id,
+                episodio_id: content.tmdb_episodio_id,
+                has_serie_data: !!content.tmdb_serie_id,
+                has_temporada_data: !!content.tmdb_temporada_id,
+                has_episodio_data: !!content.tmdb_episodio_id
+            } : null
         };
 
         // Adicionar informações de streaming se for torrent
@@ -88,6 +129,44 @@ class ContentUtils {
         }
 
         return formatted;
+    }
+
+    /**
+     * Formatar resposta específica para episódio de série
+     */
+    static formatEpisodeResponse(episode) {
+        const formatted = this.formatContentResponse(episode);
+        
+        return {
+            ...formatted,
+            episode_display: {
+                title: `${episode.nome} - S${episode.temporada?.toString().padStart(2, '0')}E${episode.episodio?.toString().padStart(2, '0')}`,
+                episode_title: episode.nome_episodio || `Episódio ${episode.episodio}`,
+                season_episode: `S${episode.temporada?.toString().padStart(2, '0')}E${episode.episodio?.toString().padStart(2, '0')}`,
+                full_description: this.buildEpisodeDescription(episode)
+            }
+        };
+    }
+
+    /**
+     * Construir descrição completa do episódio
+     */
+    static buildEpisodeDescription(episode) {
+        const parts = [];
+        
+        if (episode.descricao_serie) {
+            parts.push(`Série: ${episode.descricao_serie}`);
+        }
+        
+        if (episode.descricao_temporada) {
+            parts.push(`Temporada ${episode.temporada}: ${episode.descricao_temporada}`);
+        }
+        
+        if (episode.descricao_episodio) {
+            parts.push(`Episódio: ${episode.descricao_episodio}`);
+        }
+        
+        return parts.join('\n\n');
     }
 
     /**
@@ -121,7 +200,8 @@ class ContentUtils {
             'descricao', 'duracao', 'ano_lancamento', 'diretor', 'elenco',
             'generos_secundarios', 'idade_recomendada', 'idioma', 'legendas',
             'trailer_url', 'imdb_id', 'tmdb_id', 'sinopse', 'estudio',
-            'pais_origem', 'orcamento', 'bilheteria'
+            'pais_origem', 'orcamento', 'bilheteria', 'produtores', 'roteiristas',
+            'premios', 'trilha_sonora', 'locacao_filmagem'
         ];
 
         const sanitized = {};
@@ -135,79 +215,108 @@ class ContentUtils {
     }
 
     /**
-     * Validar URLs de imagem (poster/backdrop)
+     * Preparar dados para inserção no banco
      */
-    static isValidImageUrl(url) {
-        if (!url) return true; // Opcional
+    static prepareDataForDatabase(contentData) {
+        const prepared = { ...contentData };
         
-        try {
-            const parsedUrl = new URL(url);
-            
-            // Verificar protocolo
-            if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-                return false;
-            }
-            
-            // Verificar extensão
-            const validExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif'];
-            const pathname = parsedUrl.pathname.toLowerCase();
-            
-            return validExtensions.some(ext => pathname.endsWith(ext)) ||
-                   pathname.includes('/image/') ||  // Para serviços como TMDB
-                   pathname.includes('/img/');      // Para CDNs
-        } catch {
-            return false;
+        // Sanitizar metadados
+        if (prepared.metadata) {
+            prepared.metadata = this.sanitizeMetadata(prepared.metadata);
         }
+        
+        // Garantir valores padrão para campos opcionais
+        if (prepared.qualidades && !Array.isArray(prepared.qualidades)) {
+            prepared.qualidades = ['auto'];
+        }
+        
+        // Limpar campos TMDB se tmdb_hit for false
+        if (!prepared.tmdb_hit) {
+            prepared.tmdb_serie_id = null;
+            prepared.tmdb_temporada_id = null;
+            prepared.tmdb_episodio_id = null;
+        }
+        
+        return prepared;
     }
 
     /**
-     * Gerar URLs otimizadas de imagem
+     * Agrupar episódios por temporada
      */
-    static generateImageUrls(originalUrl, sizes = ['w300', 'w500', 'w780', 'original']) {
-        if (!originalUrl) return null;
+    static groupEpisodesBySeason(episodes) {
+        const grouped = {};
         
-        // Se for TMDB, gerar diferentes tamanhos
-        if (originalUrl.includes('image.tmdb.org')) {
-            const baseUrl = 'https://image.tmdb.org/t/p/';
-            const imagePath = originalUrl.split('/t/p/')[1]?.split('/').slice(1).join('/');
+        episodes.forEach(episode => {
+            const season = episode.temporada || 0;
             
-            if (imagePath) {
-                return sizes.reduce((acc, size) => {
-                    acc[size] = `${baseUrl}${size}/${imagePath}`;
-                    return acc;
-                }, {});
+            if (!grouped[season]) {
+                grouped[season] = {
+                    season_number: season,
+                    season_description: episode.descricao_temporada,
+                    episodes: []
+                };
             }
-        }
+            
+            grouped[season].episodes.push(this.formatEpisodeResponse(episode));
+        });
         
-        // Para outras URLs, retornar apenas a original
+        // Converter para array e ordenar
+        return Object.values(grouped).sort((a, b) => a.season_number - b.season_number);
+    }
+
+    /**
+     * Gerar dados de estatísticas de série
+     */
+    static generateSeriesStats(episodes) {
+        if (!episodes.length) return null;
+        
+        const firstEpisode = episodes[0];
+        const seasons = new Set(episodes.map(ep => ep.temporada).filter(Boolean));
+        const totalEpisodes = episodes.length;
+        const avgRating = episodes.reduce((sum, ep) => sum + (ep.rating || 0), 0) / totalEpisodes;
+        const totalViews = episodes.reduce((sum, ep) => sum + (ep.total_visualizations || 0), 0);
+        
         return {
-            original: originalUrl
+            serie_name: firstEpisode.nome,
+            total_seasons: seasons.size,
+            total_episodes: totalEpisodes,
+            average_rating: Math.round(avgRating * 10) / 10,
+            total_views: totalViews,
+            status: firstEpisode.status_serie,
+            latest_season: Math.max(...seasons),
+            has_tmdb_data: !!firstEpisode.tmdb_hit,
+            tmdb_serie_id: firstEpisode.tmdb_serie_id
         };
     }
 
     /**
-     * Otimizar metadados para resposta
+     * Validar consistência de dados de episódio
      */
-    static optimizeMetadataForResponse(metadata) {
-        if (!metadata) return {};
+    static validateEpisodeConsistency(episodeData) {
+        const errors = [];
         
-        const optimized = { ...metadata };
-        
-        // Adicionar campos calculados
-        if (optimized.duracao) {
-            optimized.duracao_formatada = this.formatDuration(optimized.duracao);
+        // Se é série, deve ter temporada e episódio
+        if (this.isSeries(episodeData.subcategoria)) {
+            if (!episodeData.temporada) {
+                errors.push('Temporada é obrigatória para séries');
+            }
+            if (!episodeData.episodio) {
+                errors.push('Número do episódio é obrigatório para séries');
+            }
         }
         
-        if (optimized.orcamento || optimized.bilheteria) {
-            optimized.financeiro = {
-                orcamento: optimized.orcamento,
-                bilheteria: optimized.bilheteria,
-                lucro: optimized.bilheteria && optimized.orcamento ? 
-                       optimized.bilheteria - optimized.orcamento : null
-            };
+        // Se tem dados TMDB de episódio, deve ter série
+        if (episodeData.tmdb_episodio_id && !episodeData.tmdb_serie_id) {
+            errors.push('ID da série no TMDB é obrigatório quando há ID de episódio');
         }
         
-        return optimized;
+        // Se tem total de episódios, deve ser maior que o episódio atual
+        if (episodeData.episodios_total && episodeData.episodio && 
+            episodeData.episodio > episodeData.episodios_total) {
+            errors.push('Número do episódio não pode ser maior que o total de episódios');
+        }
+        
+        return errors;
     }
 
     /**

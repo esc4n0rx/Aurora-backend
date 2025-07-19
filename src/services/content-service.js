@@ -8,23 +8,41 @@ class ContentService {
      * Criar novo conteúdo
      */
     static async createContent(contentData) {
-        // Sanitizar metadados
-        if (contentData.metadata) {
-            contentData.metadata = ContentUtils.sanitizeMetadata(contentData.metadata);
+        // Preparar dados para o banco
+        const preparedData = ContentUtils.prepareDataForDatabase(contentData);
+
+        // Validar consistência para episódios
+        if (ContentUtils.isSeries(preparedData.subcategoria)) {
+            const validationErrors = ContentUtils.validateEpisodeConsistency(preparedData);
+            if (validationErrors.length > 0) {
+                throw new Error(`Dados inconsistentes: ${validationErrors.join(', ')}`);
+            }
+
+            // Verificar se episódio já existe
+            if (preparedData.temporada && preparedData.episodio) {
+                const exists = await ContentModel.episodeExists(
+                    preparedData.nome, 
+                    preparedData.temporada, 
+                    preparedData.episodio
+                );
+                
+                if (exists) {
+                    throw new Error(`Episódio ${preparedData.temporada}x${preparedData.episodio} da série "${preparedData.nome}" já existe`);
+                }
+            }
         }
 
         // Validar URL de transmissão
-        if (contentData.url_transmissao) {
-            // Se for magnet link, validar formato
-            if (TorrentUtils.isMagnetLink(contentData.url_transmissao)) {
-                const hash = TorrentUtils.extractHashFromMagnet(contentData.url_transmissao);
+        if (preparedData.url_transmissao) {
+            if (TorrentUtils.isMagnetLink(preparedData.url_transmissao)) {
+                const hash = TorrentUtils.extractHashFromMagnet(preparedData.url_transmissao);
                 if (!hash) {
                     throw new Error('Magnet link inválido - hash não encontrado');
                 }
             }
         }
 
-        const content = await ContentModel.create(contentData);
+        const content = await ContentModel.create(preparedData);
         return ContentUtils.formatContentResponse(content);
     }
 
@@ -63,22 +81,48 @@ class ContentService {
             throw new Error('Conteúdo não encontrado');
         }
 
-        // Sanitizar metadados se fornecidos
-        if (updateData.metadata) {
-            updateData.metadata = ContentUtils.sanitizeMetadata(updateData.metadata);
+        // Preparar dados para atualização
+        const preparedData = ContentUtils.prepareDataForDatabase(updateData);
+
+        // Validar consistência se estiver atualizando campos de série
+        if (preparedData.subcategoria || preparedData.temporada || preparedData.episodio) {
+            const mergedData = { ...existingContent, ...preparedData };
+            
+            if (ContentUtils.isSeries(mergedData.subcategoria)) {
+                const validationErrors = ContentUtils.validateEpisodeConsistency(mergedData);
+                if (validationErrors.length > 0) {
+                    throw new Error(`Dados inconsistentes: ${validationErrors.join(', ')}`);
+                }
+
+                // Verificar conflito de episódio apenas se os dados de episódio mudaram
+                if ((preparedData.temporada && preparedData.temporada !== existingContent.temporada) ||
+                    (preparedData.episodio && preparedData.episodio !== existingContent.episodio) ||
+                    (preparedData.nome && preparedData.nome !== existingContent.nome)) {
+                    
+                    const exists = await ContentModel.episodeExists(
+                        mergedData.nome,
+                        mergedData.temporada,
+                        mergedData.episodio
+                    );
+                    
+                    if (exists) {
+                        throw new Error(`Episódio ${mergedData.temporada}x${mergedData.episodio} da série "${mergedData.nome}" já existe`);
+                    }
+                }
+            }
         }
 
         // Validar URL de transmissão se fornecida
-        if (updateData.url_transmissao) {
-            if (TorrentUtils.isMagnetLink(updateData.url_transmissao)) {
-                const hash = TorrentUtils.extractHashFromMagnet(updateData.url_transmissao);
+        if (preparedData.url_transmissao) {
+            if (TorrentUtils.isMagnetLink(preparedData.url_transmissao)) {
+                const hash = TorrentUtils.extractHashFromMagnet(preparedData.url_transmissao);
                 if (!hash) {
                     throw new Error('Magnet link inválido - hash não encontrado');
                 }
             }
         }
 
-        const content = await ContentModel.update(id, updateData);
+        const content = await ContentModel.update(id, preparedData);
         return ContentUtils.formatContentResponse(content);
     }
 
@@ -97,7 +141,7 @@ class ContentService {
     }
 
     /**
-     * Registrar visualização (CORRIGIDO para permitir re-assistir)
+     * Registrar visualização (mantendo lógica anterior)
      */
     static async recordView(contentId, viewData, ipAddress, userAgent, forceNew = false) {
         // Verificar se conteúdo existe e está ativo
@@ -112,9 +156,8 @@ class ContentService {
 
         // Verificar se IP já visualizou recentemente (apenas se não forçar nova view)
         if (!forceNew) {
-            const hasRecentView = await ContentViewModel.hasRecentView(contentId, ipAddress, 10); // Reduzido para 10 minutos
+            const hasRecentView = await ContentViewModel.hasRecentView(contentId, ipAddress, 10);
             if (hasRecentView) {
-                // Se já viu recentemente, retornar info da view existente sem erro
                 return {
                     id: 'existing_view',
                     content_id: contentId,
@@ -152,11 +195,89 @@ class ContentService {
     }
 
     /**
-     * Obter episódios de uma série
+     * Obter episódios de uma série (com formatação específica)
      */
     static async getSeriesEpisodes(seriesName, season = null) {
         const episodes = await ContentModel.findEpisodesBySeries(seriesName, season);
-        return episodes.map(episode => ContentUtils.formatContentResponse(episode));
+        
+        if (!episodes.length) {
+            return {
+                series_name: seriesName,
+                season: season,
+                episodes: [],
+                seasons_grouped: [],
+                series_stats: null
+            };
+        }
+
+        const formattedEpisodes = episodes.map(episode => ContentUtils.formatEpisodeResponse(episode));
+        const seasonsGrouped = ContentUtils.groupEpisodesBySeason(episodes);
+        const seriesStats = ContentUtils.generateSeriesStats(episodes);
+
+        return {
+            series_name: seriesName,
+            season: season,
+            episodes: formattedEpisodes,
+            seasons_grouped: seasonsGrouped,
+            series_stats: seriesStats
+        };
+    }
+
+    /**
+     * Obter todas as séries disponíveis
+     */
+    static async getAllSeries() {
+        const series = await ContentModel.findAllSeries();
+        
+        return series.map(serie => ({
+            ...serie,
+            has_tmdb_data: !!serie.tmdb_hit,
+            formatted_status: this.formatSeriesStatus(serie.status_serie)
+        }));
+    }
+
+    /**
+     * Obter temporadas de uma série
+     */
+    static async getSeriesSeasons(seriesName) {
+        const seasons = await ContentModel.findSeasonsBySeries(seriesName);
+        
+        return seasons.map(season => ({
+            season_number: season.temporada,
+            season_description: season.descricao_temporada,
+            episodes_count: parseInt(season.episodios_count),
+            display_name: `Temporada ${season.temporada}`
+        }));
+    }
+
+    /**
+     * Obter navegação de episódios (anterior/próximo)
+     */
+    static async getEpisodeNavigation(contentId) {
+        const content = await ContentModel.findById(contentId);
+        
+        if (!content || !ContentUtils.isSeries(content.subcategoria)) {
+            return null;
+        }
+
+        const [previousEpisode, nextEpisode] = await Promise.all([
+            ContentModel.findPreviousEpisode(content.nome, content.temporada, content.episodio),
+            ContentModel.findNextEpisode(content.nome, content.temporada, content.episodio)
+        ]);
+
+        return {
+            current: ContentUtils.formatEpisodeResponse(content),
+            previous: previousEpisode ? ContentUtils.formatEpisodeResponse(previousEpisode) : null,
+            next: nextEpisode ? ContentUtils.formatEpisodeResponse(nextEpisode) : null
+        };
+    }
+
+    /**
+     * Obter conteúdos relacionados
+     */
+    static async getRelatedContents(contentId, limit = 5) {
+        const relatedContents = await ContentModel.findRelated(contentId, limit);
+        return relatedContents.map(content => ContentUtils.formatContentResponse(content));
     }
 
     /**
@@ -188,7 +309,15 @@ class ContentService {
     }
 
     /**
-     * Iniciar streaming de conteúdo (NOVO - fluxo simplificado)
+     * Buscar conteúdos por TMDB
+     */
+    static async getContentsByTmdb(tmdbSerieId, tmdbTemporadaId = null, tmdbEpisodioId = null) {
+        const contents = await ContentModel.findByTmdbId(tmdbSerieId, tmdbTemporadaId, tmdbEpisodioId);
+        return contents.map(content => ContentUtils.formatContentResponse(content));
+    }
+
+    /**
+     * Iniciar streaming de conteúdo (mantendo lógica anterior)
      */
     static async startStreaming(contentId, viewData, ipAddress, userAgent, intent = 'watch') {
         // Obter detalhes do conteúdo
@@ -252,12 +381,43 @@ class ContentService {
                 subcategoria: content.subcategoria,
                 poster: content.poster,
                 backdrop: content.backdrop,
-                isTorrent: TorrentUtils.isMagnetLink(content.url_transmissao)
+                isTorrent: TorrentUtils.isMagnetLink(content.url_transmissao),
+                episode_info: content.serie_info
             },
             view: viewRecord,
             streaming: streamInfo,
             ready: streamInfo.type === 'direct' || streamInfo.status !== 'failed'
         };
+    }
+
+    /**
+     * Formatar status de série
+     */
+    static formatSeriesStatus(status) {
+        const statusMap = {
+            'em_andamento': 'Em Andamento',
+            'finalizada': 'Finalizada',
+            'cancelada': 'Cancelada',
+            'pausada': 'Pausada'
+        };
+        
+        return statusMap[status] || status;
+    }
+
+    /**
+     * Obter conteúdos recentes
+     */
+    static async getRecentContents(limit = 10) {
+        const contents = await ContentModel.findRecent(limit);
+        return contents.map(content => ContentUtils.formatContentResponse(content));
+    }
+
+    /**
+     * Obter conteúdos por faixa de rating
+     */
+    static async getContentsByRating(minRating, maxRating, limit = 20) {
+        const contents = await ContentModel.findByRatingRange(minRating, maxRating, limit);
+        return contents.map(content => ContentUtils.formatContentResponse(content));
     }
 }
 
